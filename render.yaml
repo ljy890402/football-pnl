@@ -1,0 +1,23 @@
+# Render.com 一键部署配置
+# 将整个 server/ 目录上传到 GitHub，然后在 Render 中连接仓库即可自动部署
+
+services:
+  - type: web
+    name: football-pnl
+    env: node
+    region: singapore  # 新加坡节点，国内访问延迟较低
+    plan: free         # 免费套餐（15分钟无访问会休眠，首次访问需等待启动）
+    branch: main
+    rootDir: server/
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /api/health
+    autoDeploy: true   # 推送到 GitHub 自动部署
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: ADMIN_KEY
+        value: football-admin-2026
+        sync: false    # 不在 Render Dashboard 中显示明文
+      - key: NODE_ENV
+        value: production

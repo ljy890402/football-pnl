@@ -1,0 +1,1739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="足球盈亏">
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>足球注单分析系统 v3</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+.app{display:flex;height:100vh;overflow:hidden}
+.sb{width:260px;background:#1e293b;border-right:1px solid #334155;display:flex;flex-direction:column;position:relative;flex-shrink:0}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.sb-h{padding:12px 16px;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sb-h h2{font-size:15px;color:#38bdf8;margin:0}
+.btn{padding:8px 14px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:500;min-height:36px}
+.btn-a{background:#38bdf8;color:#0f172a}
+.ml{flex:1;overflow-y:auto;padding:8px;-webkit-overflow-scrolling:touch}
+.mi{padding:10px 12px;margin-bottom:6px;background:#0f172a;border:1px solid #334155;border-radius:8px;cursor:pointer;transition:all .15s;font-size:14px}
+.mi:hover{border-color:#38bdf8}
+.mi.act{border-color:#38bdf8;background:#1e3a5f}
+.mi .t{font-weight:600;margin-bottom:3px}
+.mi .i{font-size:12px;color:#94a3b8}
+.mi .c{font-size:12px;color:#38bdf8;margin-top:3px}
+.del{float:right;background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px;padding:2px 6px}
+.tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0}
+.tab{padding:12px 16px;cursor:pointer;color:#94a3b8;border-bottom:2px solid transparent;white-space:nowrap;font-size:14px;flex-shrink:0}
+.tab.act{color:#38bdf8;border-bottom-color:#38bdf8}
+.content{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;min-width:0}
+input,select{width:100%;padding:10px 12px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:14px;min-height:36px}
+input:focus,select:focus{border-color:#38bdf8;outline:none}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{background:#1e293b;padding:8px 10px;text-align:left;color:#94a3b8;border-bottom:1px solid #334155;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid #1e293b;white-space:nowrap}
+tr:hover{background:#1e293b}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px}
+.t-w{background:#22c55e22;color:#22c55e}
+.t-l{background:#ef444422;color:#ef4444}
+.t-p{background:#f59e0b22;color:#f59e0b}
+.t-pn{background:#94a3b822;color:#94a3b8}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:14px 0}
+.sc{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:14px;text-align:center}
+.sc .v{font-size:22px;font-weight:700;color:#38bdf8}
+.sc .l{font-size:11px;color:#94a3b8;margin-top:4px}
+.modal-o{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
+.modal{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;max-width:500px;width:100%;max-height:90vh;overflow-y:auto}
+.pnl-m{display:flex;flex-wrap:wrap;gap:2px;margin:12px 0}
+.pc{width:54px;height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:600;border-radius:4px;cursor:pointer}
+.pc:hover{transform:scale(1.12)}
+.ht-badge{display:inline-block;padding:2px 6px;background:#f59e0b33;color:#f59e0b;border-radius:4px;font-size:11px;margin-left:4px}
+
+/* === 手机适配 === */
+.ham{display:none;position:fixed;top:8px;left:8px;z-index:999;background:#1e293b;border:1px solid #334155;color:#38bdf8;font-size:20px;width:38px;height:38px;border-radius:8px;cursor:pointer;align-items:center;justify-content:center}
+.sb-ov{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:899}
+@media(max-width:768px){
+  .ham{display:flex}
+  .sb{position:fixed;top:0;left:0;height:100%;z-index:900;transform:translateX(-100%);transition:transform .2s;width:260px}
+  .sb.show{transform:translateX(0)}
+  .sb-ov.show{display:block}
+  .main .tabs{padding-left:50px}
+  .content{padding:12px}
+  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;font-size:12px}
+  th,td{padding:6px 8px}
+  .sg{grid-template-columns:repeat(2,1fr)}
+  .btn{font-size:13px;padding:8px 10px}
+  input,select{font-size:16px;padding:10px 10px}
+  .modal{width:calc(100% - 32px);max-height:85vh}
+}
+@media(max-width:380px){
+  .sg{grid-template-columns:1fr 1fr}
+  .tab{padding:10px 10px;font-size:12px}
+}
+</style>
+</head>
+<body>
+<!-- 汉堡菜单按钮 -->
+<button class="ham" id="hamBtn" onclick="toggleSB()">☰</button>
+<!-- 侧边栏遮罩 -->
+<div class="sb-ov" id="sbOv" onclick="toggleSB()"></div>
+  <div class="sb">
+    <div class="sb-h"><h2>比赛列表</h2><button class="btn btn-a" onclick="showAdd()">+新增</button></div>
+    <div class="ml" id="ml"></div>
+    <div style="padding:8px 16px;border-top:1px solid #334155;display:flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8">
+      <div id="syncDot" style="width:8px;height:8px;border-radius:50%;background:#64748b;flex-shrink:0"></div>
+      <span id="syncText">连接中...</span>
+    </div>
+    <div style="padding:10px;border-top:1px solid #334155">
+      <button class="btn btn-a" style="width:100%;margin-bottom:6px" onclick="manualSync()">手动同步</button>
+      <button class="btn btn-a" style="width:100%;margin-bottom:6px" onclick="exp()">导出</button>
+      <button class="btn btn-a" style="width:100%" onclick="imp()">导入</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="tabs" id="tabs">
+      <div class="tab act" dt="setup">比赛设置</div>
+      <div class="tab" dt="bets">录入注单</div>
+      <div class="tab" dt="result">比赛结果</div>
+      <div class="tab" dt="analysis">盈亏分析</div>
+      <div class="tab" dt="live">实时追踪</div>
+      <div class="tab" dt="settle">结算</div>
+      <div class="tab" dt="sim">赛前模拟</div>
+      <div class="tab" dt="history">历史记录</div>
+      <div class="tab" dt="user">用户分析</div>
+    </div>
+    <div class="content" id="mc"></div>
+  </div>
+</div>
+
+<div class="modal-o" id="addM" style="display:none">
+  <div class="modal">
+    <h3 style="color:#38bdf8;margin-bottom:14px">新增比赛</h3>
+    <div style="margin-bottom:12px">
+      <label style="font-size:13px;color:#94a3b8">主队</label>
+      <input id="nH" style="margin-top:4px;width:100%">
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:13px;color:#94a3b8">客队</label>
+      <input id="nA" style="margin-top:4px;width:100%">
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:13px;color:#94a3b8">比赛时间</label>
+      <input id="nT" type="datetime-local" style="margin-top:4px;width:100%">
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:13px;color:#94a3b8">启用玩法</label>
+      <div id="nPT" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-a" onclick="doAdd()">确认</button>
+      <button class="btn" style="background:#ef4444;color:#fff" onclick="hideAdd()">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// ===== 数据 =====
+const S = { ms:[], cid:null, cl:new Set(), lastClient:'', bl:{} };
+
+const PC = {
+  // 全场
+  '1x2':   { n:'独赢',   o:(h,a)=>[h+'胜','平局',a+'胜'], grp:'全场', isHt:false },
+  'ah':    { n:'让球',   hc:true, o:(h,a)=>[h+'让球',a+'让球'], grp:'全场', isHt:false },
+  'ou':    { n:'大小球',  hc:true, o:()=>['大球','小球'], grp:'全场', isHt:false },
+  'cs':    { n:'波胆',   c:true, grp:'全场', isHt:false },
+  'btts':  { n:'双方进球', o:()=>['是','否'], grp:'全场', isHt:false },
+  'corners':{ n:'角球大小', hc:true, o:()=>['角球大','角球小'], grp:'全场', isHt:false },
+  'cah':   { n:'角球让球', hc:true, o:(h,a)=>[h+'角球让球',a+'角球让球'], grp:'全场', isHt:false },
+  'firstg': { n:'首球',   o:(h,a)=>[h+'首球',a+'首球','无进球'], grp:'全场', isHt:false },
+  'kickoff':{ n:'先开球', o:(h,a)=>[h,a], grp:'全场', isHt:false },
+  // 上半场
+  'ht1x2': { n:'上半场独赢', o:(h,a)=>[h+'胜','平局',a+'胜'], grp:'上半场', isHt:true },
+  'htah':  { n:'上半场让球', hc:true, o:(h,a)=>[h+'让球',a+'让球'], grp:'上半场', isHt:true },
+  'htou':  { n:'上半场大小球', hc:true, o:()=>['上半场大球','上半场小球'], grp:'上半场', isHt:true },
+  'htcs':  { n:'上半场波胆', c:true, grp:'上半场', isHt:true },
+  'htcah': { n:'上半场角球让球', hc:true, o:(h,a)=>[h+'角球让球',a+'角球让球'], grp:'上半场', isHt:true },
+  'htcou': { n:'上半场角球大小', hc:true, o:()=>['上半场角球大','上半场角球小'], grp:'上半场', isHt:true },
+};
+
+// ===== 存储 =====
+// ===== 余额充值 =====
+function doRecharge(client) {
+  const amt = parseFloat(document.getElementById('blAmt')?.value);
+  if (isNaN(amt) || amt <= 0) return alert('请输入有效充值金额');
+  const note = document.getElementById('blNote')?.value.trim() || '';
+  if (!S.bl[client]) S.bl[client] = { credit: 0, txns: [] };
+  S.bl[client].credit += amt;
+  S.bl[client].txns.push({ amt, note, at: new Date().toISOString() });
+  save();
+  renderUserDetail();
+  alert('充值成功：+' + amt + (note ? '（'+note+'）' : ''));
+}
+
+// ===== 手机端：侧边栏开关 =====
+function toggleSB() {
+  const sb = document.querySelector('.sb');
+  const ov = document.getElementById('sbOv');
+  const btn = document.getElementById('hamBtn');
+  if (sb.classList.contains('show')) {
+    sb.classList.remove('show');
+    ov.classList.remove('show');
+  } else {
+    sb.classList.add('show');
+    ov.classList.add('show');
+  }
+}
+
+// ===== 辅助 =====
+function isFullTimeSet(res) {
+  return res && res.hg != null && res.ag != null;
+}
+function isHalfTimeSet(res) {
+  return res && res.htH != null && res.htA != null;
+}
+function getNum(id) {
+  const v = document.getElementById(id).value;
+  if (v === '') return null;
+  const n = parseInt(v);
+  return isNaN(n) ? null : n;
+}
+
+// ===== 初始化 =====
+// ===== 比赛列表 =====
+function renderList() {
+  const el = document.getElementById('ml');
+  if (!S.ms.length) {
+    el.innerHTML = '<p style="color:#94a3b8;padding:20px;text-align:center;font-size:12px">暂无比赛</p>';
+    return;
+  }
+  el.innerHTML = S.ms.map(m => {
+    const act = m.id === S.cid ? ' act' : '';
+    let resStr = '未结束';
+    if (m.res) {
+      if (isHalfTimeSet(m.res) && !isFullTimeSet(m.res)) {
+        resStr = '上半场 ' + m.res.htH + '-' + m.res.htA;
+      } else if (isFullTimeSet(m.res)) {
+        resStr = m.res.hg + '-' + m.res.ag;
+      }
+    }
+    return '<div class="mi'+act+'" onclick="switchMatch(\''+m.id+'\')">' +
+      '<button class="del" onclick="event.stopPropagation();delMatch(\''+m.id+'\')">✕</button>' +
+      '<div class="t">'+m.h+' vs '+m.a+'</div>' +
+      '<div class="i">'+(m.time?m.time.replace('T',' '):'时间未设')+' | '+resStr+'</div>' +
+      '<div class="c">注单：'+m.bets.length+'笔</div>' +
+      '</div>';
+  }).join('');
+}
+
+function switchMatch(id) {
+  S.cid = id;
+  // 保存 UI 状态
+  try {
+    const ui = JSON.parse(localStorage.getItem('fpnl3_ui')||'{}');
+    ui.cid = id;
+    localStorage.setItem('fpnl3_ui', JSON.stringify(ui));
+  } catch(e) {}
+  renderList();
+  // 手机端自动关闭侧边栏
+  if (window.innerWidth <= 768) toggleSB();
+  const t = document.querySelector('#tabs .tab.act');
+  switchTab(t ? t.getAttribute('dt') : 'setup');
+}
+
+function delMatch(id) {
+  if (!confirm('删除本场比赛及所有注单？')) return;
+  S.ms = S.ms.filter(m => m.id !== id);
+  if (S.cid === id) S.cid = S.ms.length ? S.ms[0].id : null;
+  // 保存 UI 状态
+  try {
+    const ui = JSON.parse(localStorage.getItem('fpnl3_ui')||'{}');
+    ui.cid = S.cid;
+    localStorage.setItem('fpnl3_ui', JSON.stringify(ui));
+  } catch(e) {}
+  save(); renderList();
+  if (S.cid) switchTab('setup');
+  else document.getElementById('mc').innerHTML = '<p style="color:#94a3b8;padding:40px;text-align:center">请添加比赛</p>';
+}
+
+function getCur() { return S.ms.find(m => m.id === S.cid) || null; }
+
+// ===== 弹窗 =====
+function showAdd() {
+  document.getElementById('addM').style.display = 'flex';
+  renderPTChk(null);
+}
+
+function hideAdd() { document.getElementById('addM').style.display = 'none'; }
+
+function renderPTChk(selected) {
+  const groups = {'全场':'全场玩法','上半场':'上半场玩法'};
+  const el = document.getElementById('nPT');
+  let h = '';
+  for (const [grp, label] of Object.entries(groups)) {
+    const items = Object.entries(PC).filter(([,c]) => c.grp === grp);
+    if (!items.length) continue;
+    h += '<div style="width:100%;margin:4px 0"><span style="font-size:11px;color:#38bdf8">'+label+'</span></div>';
+    h += items.map(([k,c]) => {
+      const chk = (!selected || selected.includes(k)) ? 'checked' : '';
+      return '<label style="font-size:12px;cursor:pointer;margin-right:10px"><input type="checkbox" value="'+k+'" '+chk+' style="margin-right:3px">'+c.n+'</label>';
+    }).join('');
+  }
+  el.innerHTML = h;
+}
+
+function doAdd() {
+  const h = document.getElementById('nH').value.trim();
+  const a = document.getElementById('nA').value.trim();
+  if (!h || !a) return alert('填写两队名称');
+  const pts = Array.from(document.querySelectorAll('#nPT input:checked')).map(c => c.value);
+  const m = {
+    id: 'm'+Date.now(),
+    h, a, time: document.getElementById('nT').value,
+    pts, bets: [], res: null
+  };
+  S.ms.push(m);
+  S.cid = m.id;
+  save(); renderList(); hideAdd(); switchTab('setup');
+}
+
+// ===== 标签切换 =====
+document.getElementById('tabs').addEventListener('click', e => {
+  const t = e.target.closest('.tab');
+  if (t) switchTab(t.getAttribute('dt'));
+});
+
+function switchTab(dt) {
+  document.querySelectorAll('#tabs .tab').forEach(t => t.classList.remove('act'));
+  const ta = document.querySelector('#tabs .tab[dt="'+dt+'"]');
+  if (ta) ta.classList.add('act');
+  // 保存当前标签到 UI 状态
+  try {
+    const ui = JSON.parse(localStorage.getItem('fpnl3_ui')||'{}');
+    ui.tab = dt;
+    localStorage.setItem('fpnl3_ui', JSON.stringify(ui));
+  } catch(e) {}
+  const m = getCur();
+  if (!m && !['history','user'].includes(dt)) {
+    document.getElementById('mc').innerHTML = '<p style="color:#94a3b8;padding:40px;text-align:center">请先添加或选择比赛</p>';
+    return;
+  }
+  renderPanel(dt, m);
+}
+
+// ===== 渲染面板 =====
+function renderPanel(tab, m) {
+  const c = document.getElementById('mc');
+  switch(tab) {
+    case 'setup':    c.innerHTML = renderSetup(m); break;
+    case 'bets':     c.innerHTML = renderBets(m); setTimeout(()=>onPTChange(), 50); break;
+    case 'result':   c.innerHTML = renderResult(m); break;
+    case 'analysis': c.innerHTML = renderAnalysis(m); break;
+    case 'sim':      c.innerHTML = renderSim(m); break;
+    case 'settle':  c.innerHTML = renderSettle(); break;
+    case 'history':  c.innerHTML = renderHistory(); break;
+    case 'user':     c.innerHTML = renderUser(); break;
+  }
+}
+
+// ===== 比赛设置 =====
+function renderSetup(m) {
+  let h = '<h3 style="color:#38bdf8;margin-bottom:14px">比赛设置</h3>';
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+  h += '<div style="flex:1;min-width:140px"><label style="font-size:13px;color:#94a3b8">主队</label><input id="sH" value="'+m.h+'" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:140px"><label style="font-size:13px;color:#94a3b8">客队</label><input id="sA" value="'+m.a+'" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:180px"><label style="font-size:13px;color:#94a3b8">比赛时间</label><input id="sT" type="datetime-local" value="'+m.time+'" style="margin-top:4px"></div>';
+  h += '</div>';
+  h += '<div style="margin:12px 0"><label style="font-size:13px;color:#94a3b8">启用玩法</label><div style="margin-top:6px">';
+  const groups2 = {'全场':'全场玩法','上半场':'上半场玩法'};
+  for (const [grp, label] of Object.entries(groups2)) {
+    const items = Object.entries(PC).filter(([,c]) => c.grp === grp);
+    if (!items.length) continue;
+    h += '<div style="margin:4px 0"><span style="font-size:11px;color:#38bdf8">'+label+'</span></div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:4px 12px;margin-bottom:6px">';
+    h += items.map(([k,c]) => {
+      const chk = m.pts.includes(k) ? 'checked' : '';
+      return '<label style="font-size:12px;cursor:pointer"><input type="checkbox" value="'+k+'" '+chk+' onchange="togglePT(\''+m.id+'\',\''+k+'\',this.checked)" style="margin-right:3px">'+c.n+'</label>';
+    }).join('');
+    h += '</div>';
+  }
+  h += '</div>';
+  h += '<button class="btn btn-a" style="margin-bottom:16px" onclick="saveSetup(\''+m.id+'\')">保存设置</button>';
+  h += '<h4 style="color:#38bdf8;margin:14px 0 10px">已录入注单（'+m.bets.length+'笔）</h4>';
+  if (m.bets.length) h += renderBetTable(m.bets, m);
+  else h += '<p style="color:#94a3b8">暂无注单</p>';
+  return h;
+}
+
+function saveSetup(id) {
+  const m = S.ms.find(x => x.id === id);
+  if (!m) return;
+  m.h = document.getElementById('sH').value.trim();
+  m.a = document.getElementById('sA').value.trim();
+  m.time = document.getElementById('sT').value;
+  save(); renderList(); alert('已保存');
+}
+
+function togglePT(id, pt, chk) {
+  const m = S.ms.find(x => x.id === id);
+  if (!m) return;
+  if (chk && !m.pts.includes(pt)) m.pts.push(pt);
+  else if (!chk) m.pts = m.pts.filter(p => p !== pt);
+  save();
+}
+
+// ===== 可赢金额计算 =====
+function calcWinAmt(amt, odds) {
+  if (isNaN(amt) || isNaN(odds) || amt <= 0 || odds < 1) return '-';
+  return (amt * (odds - 1)).toFixed(0);
+}
+
+// ===== 注单排序（最新在前）=====
+function sortBetsNewest(bets) {
+  return [...bets].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+function calcWinPreview() {
+  const oddsEl = document.getElementById('oddsPreview');
+  if (!oddsEl) return;
+  const amt = parseFloat(document.getElementById('bAmt')?.value);
+  const winAmt = parseFloat(document.getElementById('bWinAmt')?.value);
+  if (!amt || amt <= 0 || isNaN(winAmt) || winAmt < 0) {
+    oddsEl.textContent = '-';
+    return;
+  }
+  const odds = (amt + winAmt) / amt;
+  oddsEl.textContent = odds.toFixed(2);
+}
+
+// ===== 注单表格 =====
+function renderBetTable(bets, m) {
+  const hasRes = m.res && (isFullTimeSet(m.res) || isHalfTimeSet(m.res));
+  let h = '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>盘口</th><th>金额</th><th>赔率</th><th>可赢</th><th>结算状态</th><th>操作</th></tr></thead><tbody>';
+  h += bets.map(b => {
+    const pt = PC[b.pt] || {n:b.pt};
+    let hc = '-';
+    if (b.hc !== null) hc = b.hcSplit ? b.hcSplit.join('/') : b.hc;
+    const winAmt = calcWinAmt(b.amt, b.odds);
+    // 结算状态
+    let settleStr = '';
+    if (b.settled) {
+      const rl = resLabel(b.settlement.res);
+      settleStr = '<span class="tag '+(b.settlement.res==='win'?'t-w':b.settlement.res==='lose'?'t-l':'t-p')+'">'+rl+'</span>';
+    } else if (!hasRes) {
+      settleStr = '<span style="color:#94a3b8;font-size:11px">无赛果</span>';
+    } else {
+      settleStr = '<button class="btn" style="background:#38bdf8;color:#fff;font-size:11px;padding:3px 8px" onclick="doSettleBet(\''+m.id+'\',\''+b.id+'\')">结算</button>';
+    }
+    return '<tr><td>'+b.client+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td>'+hc+'</td><td>'+b.amt+'</td><td>'+b.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
+      '<td>'+settleStr+'</td>' +
+      '<td><button class="btn" style="background:#ef4444;color:#fff;font-size:11px;padding:3px 8px" onclick="delBet(\''+m.id+'\',\''+b.id+'\')">删除</button>' +
+      (b.settled ? '<button class="btn" style="background:#94a3b8;color:#fff;font-size:11px;padding:3px 8px;margin-left:4px" onclick="undoSettle(\''+m.id+'\',\''+b.id+'\')">撤销</button>' : '') +
+      '</td></tr>';
+  }).join('');
+  h += '</tbody></table>';
+  return h;
+}
+
+function delBet(mid, bid) {
+  const m = S.ms.find(x => x.id === mid); if (!m) return;
+  m.bets = m.bets.filter(b => b.id !== bid);
+  save(); renderList(); switchTab('bets');
+}
+
+function doSettleBet(mid, bid) {
+  const m = S.ms.find(x => x.id === mid); if (!m) return;
+  const b = m.bets.find(x => x.id === bid); if (!b) return;
+  // 开球注单只需先开球结果，不需比分
+  if (b.pt === 'kickoff') {
+    if (!m.res || m.res.kickOff === '') return alert('请先在「比赛结果」标签页填写先开球结果');
+  } else {
+    if (!m.res || (!isFullTimeSet(m.res) && !isHalfTimeSet(m.res))) return alert('请先在「比赛结果」标签页填写比赛结果');
+  }
+  const j = judge(b, m.res, m.h, m.a);
+  b.settled = true;
+  b.settlement = {res:j.res, pay:j.pay, net: j.pay - b.amt, settledAt:new Date().toISOString()};
+  save(); renderList();
+  const cur = document.querySelector('#tabs .tab.act');
+  if (cur) switchTab(cur.getAttribute('dt'));
+}
+
+function undoSettle(mid, bid) {
+  const m = S.ms.find(x => x.id === mid); if (!m) return;
+  const b = m.bets.find(x => x.id === bid); if (!b) return;
+  b.settled = false; b.settlement = null;
+  save(); renderList();
+  const cur = document.querySelector('#tabs .tab.act');
+  if (cur) switchTab(cur.getAttribute('dt'));
+}
+
+// ===== 结算页面 =====
+function renderSettle() {
+  const curId = S.cid;
+  const allBets = [];
+  S.ms.forEach(m => {
+    if (curId && m.id !== curId) return; // 只显示当前选中比赛的注单
+    m.bets.forEach(b => {
+      const hasRes = m.res && (
+        b.pt === 'kickoff' ? m.res.kickOff !== '' :
+        isFullTimeSet(m.res) || isHalfTimeSet(m.res)
+      );
+      allBets.push(Object.assign({}, b, {_mid:m.id, _m:m, canSettle:hasRes && !b.settled, settled:b.settled||false}));
+    });
+  });
+
+  const pending = allBets.filter(b => b.canSettle);
+  const settled = allBets.filter(b => b.settled);
+  const noRes = allBets.filter(b => !b.canSettle && !b.settled);
+
+  const byUser = {};
+  pending.forEach(b => {
+    if (!byUser[b.client]) byUser[b.client] = {pending:[], settled:[]};
+    byUser[b.client].pending.push(b);
+  });
+  settled.forEach(b => {
+    if (!byUser[b.client]) byUser[b.client] = {pending:[], settled:[]};
+    byUser[b.client].settled.push(b);
+  });
+
+  let h = '<h3 style="color:#38bdf8;margin-bottom:14px">结算管理</h3>';
+  h += '<div class="sg">';
+  h += '<div class="sc"><div class="v">'+(pending.length+settled.length+noRes.length)+'</div><div class="l">总注单</div></div>';
+  h += '<div class="sc"><div class="v" style="color:#f59e0b">'+(noRes.length?'<span title="请先填写比赛结果">'+noRes.length+' 笔无赛果</span>':'✓')+'</div><div class="l">待结算</div></div>';
+  h += '<div class="sc"><div class="v" style="color:#38bdf8">'+pending.length+'</div><div class="l">可结算</div></div>';
+  h += '<div class="sc"><div class="v" style="color:#22c55e">'+settled.length+'</div><div class="l">已结算</div></div>';
+  h += '</div>';
+
+  // 全部结算按钮
+  if (pending.length) {
+    h += '<div style="margin:12px 0"><button class="btn" style="background:#38bdf8;color:#fff;font-size:14px;padding:8px 20px" onclick="doSettleAll()">全部结算（'+pending.length+'笔）</button></div>';
+  }
+
+  const users = Object.keys(byUser);
+  if (users.length) {
+    h += '<h4 style="color:#38bdf8;margin:18px 0 10px">按用户结算</h4>';
+    users.forEach(client => {
+      const u = byUser[client];
+      h += '<div style="margin:8px 0;padding:12px;background:#1e293b;border-radius:10px">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+      h += '<div style="font-weight:600">'+client+'</div>';
+      h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+      h += '<span style="font-size:12px;color:#94a3b8">待结算 '+u.pending.length+' 笔 / 已结算 '+u.settled.length+' 笔</span>';
+      if (u.pending.length) {
+        h += '<button class="btn" style="background:#38bdf8;color:#fff;font-size:12px;padding:4px 12px" onclick="doSettleUser(this)" data-client="'+client.replace(/"/g,'&quot;')+'">结算该用户（'+u.pending.length+'笔）</button>';
+      }
+      h += '</div></div>';
+      if (u.pending.length) {
+        h += '<div style="margin-top:8px;font-size:12px;color:#94a3b8">待结算注单：</div>';
+        h += '<div style="margin-top:4px">';
+        u.pending.forEach(b => {
+          const m2 = b._m;
+          const pt = PC[b.pt]||{n:b.pt};
+          h += '<span style="display:inline-block;margin:2px 4px 2px 0;padding:3px 8px;background:#0f172a;border-radius:4px;font-size:11px">'+m2.h+' vs '+m2.a+' · '+pt.n+' · '+b.opt+' · '+b.amt+'<button class="btn" style="background:#38bdf8;color:#fff;font-size:10px;padding:1px 6px;margin-left:6px" onclick="doSettleBet(\''+b._mid+'\',\''+b.id+'\')">结</button></span>';
+        });
+        h += '</div>';
+      }
+      h += '</div>';
+    });
+  }
+
+  if (settled.length) {
+    h += '<h4 style="color:#22c55e;margin:18px 0 10px">已结算注单（'+settled.length+'笔）</h4>';
+    h += '<table><thead><tr><th>客户</th><th>比赛</th><th>玩法</th><th>选项</th><th>金额</th><th>结果</th><th>赔付</th><th>盈亏</th><th>操作</th></tr></thead><tbody>';
+    settled.forEach(b => {
+      const m2 = b._m;
+      const pt = PC[b.pt]||{n:b.pt};
+      const sr = b.settlement || {};
+      const rl = resLabel(sr.res);
+      const pay = sr.pay || 0;
+      const net = b.amt - pay; // 庄家视角：正=庄家赚
+      h += '<tr><td>'+b.client+'</td><td>'+m2.h+' vs '+m2.a+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td>'+b.amt+'</td>';
+      h += '<td><span class="tag '+(sr.res==='win'?'t-w':sr.res==='lose'?'t-l':'t-p')+'">'+rl+'</span></td>';
+      h += '<td>'+pay.toFixed(1)+'</td>';
+      h += '<td style="color:'+(net>=0?'#22c55e':'#ef4444')+';font-weight:600">'+(net>=0?'+':'')+net.toFixed(0)+'</td>';
+      h += '<td><button class="btn" style="background:#94a3b8;color:#fff;font-size:11px;padding:3px 8px" onclick="undoSettle(\''+b._mid+'\',\''+b.id+'\')">撤销</button></td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+  return h;
+}
+
+function doSettleUser(btn) {
+  const client = btn.getAttribute('data-client');
+  if (!client) return;
+  const curId = S.cid;
+  let count = 0;
+  S.ms.forEach(m => {
+    if (curId && m.id !== curId) return; // 只结算当前比赛
+    if (!m.res || (!isFullTimeSet(m.res) && !isHalfTimeSet(m.res))) return;
+    m.bets.forEach(b => {
+      if (b.client !== client || b.settled) return;
+      const j = judge(b, m.res, m.h, m.a);
+      b.settled = true;
+      b.settlement = {res:j.res, pay:j.pay, net: j.pay - b.amt, settledAt:new Date().toISOString()};
+      count++;
+    });
+  });
+  save(); renderList();
+  alert('已结算 '+count+' 笔注单');
+  switchTab('settle');
+}
+
+function doSettleAll() {
+  const curId = S.cid;
+  let count = 0;
+  S.ms.forEach(m => {
+    if (curId && m.id !== curId) return; // 只结算当前比赛
+    if (!m.res || (!isFullTimeSet(m.res) && !isHalfTimeSet(m.res))) return;
+    m.bets.forEach(b => {
+      if (b.settled) return;
+      const j = judge(b, m.res, m.h, m.a);
+      b.settled = true;
+      b.settlement = {res:j.res, pay:j.pay, net: j.pay - b.amt, settledAt:new Date().toISOString()};
+      count++;
+    });
+  });
+  save(); renderList();
+  alert('已全部结算 '+count+' 笔注单');
+  switchTab('settle');
+}
+
+// ===== 录入注单 =====
+function renderBets(m) {
+  let h = '<h3 style="color:#38bdf8;margin-bottom:14px">录入注单</h3>';
+  // 客户
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">';
+  const clArr = Array.from(S.cl).sort();
+  h += '<div style="flex:1;min-width:160px"><label style="font-size:13px;color:#94a3b8">客户编号</label>';
+  if (clArr.length > 0) {
+    // 已有客户：显示下拉 + 可手动输入新客户
+    const selVal = S.lastClient && clArr.includes(S.lastClient) ? S.lastClient : '';
+    h += '<select id="bCsel" onchange="onClientSelChange()" style="margin-top:4px;width:100%">';
+    h += '<option value="">-- 选择已有客户 --</option>';
+    h += clArr.map(c => '<option value="'+c+'"'+(c===selVal?' selected':'')+'>'+c+'</option>').join('');
+    h += '<option value="__new__">＋ 输入新客户...</option>';
+    h += '</select>';
+    h += '<input id="bC" value="'+(selVal||'')+'" placeholder="新客户编号" style="margin-top:4px;width:100%;display:none;">';
+  } else {
+    // 无客户：直接输入框
+    h += '<input id="bC" value="" placeholder="输入客户编号" style="margin-top:4px;width:100%">';
+  }
+  h += '</div>';
+  // 玩法
+  h += '<div style="flex:1;min-width:140px"><label style="font-size:13px;color:#94a3b8">玩法</label>';
+  let ptOpts = '';
+  const gLabels = {'全场':'全场玩法','上半场':'上半场玩法'};
+  for (const [grp, label] of Object.entries(gLabels)) {
+    const items = m.pts.filter(p => PC[p] && PC[p].grp === grp);
+    if (!items.length) continue;
+    ptOpts += '<optgroup label="'+label+'">';
+    ptOpts += items.map(p => '<option value="'+p+'">'+PC[p].n+'</option>').join('');
+    ptOpts += '</optgroup>';
+  }
+  h += '<select id="bPT" onchange="onPTChange()" style="margin-top:4px;width:100%">'+ptOpts+'</select></div>';
+  h += '</div>';
+  // 选项 + 盘口
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">';
+  h += '<div id="optWrap" style="flex:1;min-width:180px"></div>';
+  h += '<div id="hcWrap" style="flex:1;min-width:140px;display:none"><label style="font-size:13px;color:#94a3b8">盘口</label><input id="bHC" placeholder="如：-0.5 或 -0.5/1" style="margin-top:4px;width:100%"></div>';
+  h += '</div>';
+  // 金额 + 可赢金额 + 时间 + 赔率预览
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end">';
+  h += '<div style="flex:1;min-width:100px"><label style="font-size:13px;color:#94a3b8">金额</label><input id="bAmt" type="number" min="1" oninput="calcWinPreview()" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:100px"><label style="font-size:13px;color:#94a3b8">可赢金额（不含本金）</label><input id="bWinAmt" type="number" min="0" step="1" oninput="calcWinPreview()" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:120px"><label style="font-size:13px;color:#94a3b8">时间</label><input id="bTime" type="time" value="'+(new Date().toTimeString().slice(0,5))+'" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:120px"><label style="font-size:13px;color:#94a3b8">赔率</label><div id="oddsPreview" style="margin-top:6px;font-size:18px;font-weight:700;color:#38bdf8">-</div></div>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px;margin-bottom:16px">';
+  h += '<button class="btn" style="background:#22c55e;color:#fff" onclick="doAddBet(\''+m.id+'\')">添加注单</button>';
+  h += '<button class="btn btn-a" onclick="loadDemo(\''+m.id+'\')">载入示例</button>';
+  h += '</div>';
+  h += '<h4 style="color:#38bdf8;margin:14px 0 10px">本场注单（'+m.bets.length+'笔，最新在前）</h4>';
+  if (m.bets.length) h += renderBetTable(sortBetsNewest(m.bets), m);
+  else h += '<p style="color:#94a3b8">暂无注单</p>';
+  setTimeout(() => {
+    onPTChange();
+    // 默认选中波胆（如果可用）
+    const bPT = document.getElementById('bPT');
+    if (bPT && m.pts.includes('cs')) bPT.value = 'cs';
+    else if (bPT && m.pts.length) bPT.value = m.pts[0];
+    onPTChange();
+    calcWinPreview();
+  }, 100);
+  return h;
+}
+
+// 客户下拉选择联动
+function onClientSelChange() {
+  const sel = document.getElementById('bCsel');
+  const inp = document.getElementById('bC');
+  if (!sel || !inp) return;
+  if (sel.value === '__new__') {
+    // 选择"输入新客户"
+    inp.value = '';
+    inp.style.display = 'block';
+    inp.focus();
+    sel.style.display = 'none';
+  } else {
+    inp.value = sel.value;
+    inp.style.display = 'none';
+    sel.style.display = 'block';
+  }
+}
+
+// 获取当前选中的客户名（兼容下拉和输入框两种模式）
+function getClientInput() {
+  const sel = document.getElementById('bCsel');
+  const inp = document.getElementById('bC');
+  if (sel && sel.style.display !== 'none' && sel.value && sel.value !== '__new__') {
+    return sel.value;
+  }
+  return inp ? inp.value.trim() : '';
+}
+
+function onPTChange() {
+  const m = getCur(); if (!m) return;
+  const pt = document.getElementById('bPT').value;
+  const cfg = PC[pt];
+  const optWrap = document.getElementById('optWrap');
+  if (pt === 'cs' || pt === 'htcs') {
+    let scores = [];
+    const max = pt === 'htcs' ? 4 : 6;
+    for (let i = 0; i <= max; i++) for (let j = 0; j <= max; j++) scores.push(i+'-'+j);
+    if (pt === 'cs') scores.push('其他');
+    optWrap.innerHTML = '<label style="font-size:13px;color:#94a3b8">投注选项</label>' +
+      '<input id="bOpt" list="sclist" placeholder="选择或输入比分（如9:0）" style="margin-top:4px;width:100%">' +
+      '<datalist id="sclist">'+scores.map(s => '<option value="'+s+'">').join('')+'</datalist>';
+  } else if (cfg && cfg.o) {
+    const opts = cfg.o(m.h, m.a);
+    optWrap.innerHTML = '<label style="font-size:13px;color:#94a3b8">投注选项</label>' +
+      '<select id="bOpt" style="margin-top:4px;width:100%">'+opts.map(o => '<option value="'+o+'">'+o+'</option>').join('')+'</select>';
+  } else {
+    optWrap.innerHTML = '<label style="font-size:13px;color:#94a3b8">投注选项</label><input id="bOpt" placeholder="投注选项" style="margin-top:4px;width:100%">';
+  }
+  document.getElementById('hcWrap').style.display = (cfg && cfg.hc) ? 'block' : 'none';
+}
+
+function doAddBet(mid) {
+  const m = S.ms.find(x => x.id === mid); if (!m) return;
+  const client = getClientInput();
+  const pt = document.getElementById('bPT').value;
+  const opt = document.getElementById('bOpt').value.trim();
+  const amt = parseFloat(document.getElementById('bAmt').value);
+  const winAmt = parseFloat(document.getElementById('bWinAmt').value);
+  if (!client) return alert('输入客户编号');
+  if (!opt) return alert('选择或输入投注选项');
+  if (isNaN(amt) || amt <= 0) return alert('输入有效金额');
+  if (isNaN(winAmt) || winAmt < 0) return alert('可赢金额（不含本金）必须 >= 0');
+  const odds = (amt + winAmt) / amt;
+  S.cl.add(client);
+  let hc = null, hcS = null;
+  if (PC[pt] && PC[pt].hc) {
+    const hcStr = document.getElementById('bHC').value.trim();
+    if (hcStr) {
+      if (hcStr.includes('/')) {
+        const parts = hcStr.split('/').map(s => { let v = parseFloat(s.trim()); return isNaN(v) ? NaN : (pt==='ah'||pt==='cah'||pt==='htcah'||pt==='htah') ? Math.abs(v) : v; });
+        if (parts.some(isNaN)) return alert('盘口格式不正确');
+        hcS = parts; hc = (parts[0]+parts[1])/2;
+      } else {
+        let v = parseFloat(hcStr);
+        if (isNaN(v)) return alert('盘口格式不正确');
+        hc = (pt==='ah'||pt==='cah'||pt==='htcah'||pt==='htah') ? Math.abs(v) : v;
+      }
+    }
+  }
+  m.bets.push({ id:'b'+Date.now(), client, pt, opt, amt, odds, time:document.getElementById('bTime').value, hc, hcSplit:hcS, createdAt:new Date().toISOString() });
+  S.lastClient = client;
+  save(); renderList();
+  document.getElementById('bOpt').value = '';
+  const hcWrap = document.getElementById('hcWrap');
+  if (hcWrap) { const hcInput = document.getElementById('bHC'); if (hcInput) hcInput.value = ''; }
+  document.getElementById('bAmt').value = '';
+  document.getElementById('bWinAmt').value = '';
+  document.getElementById('bTime').value = new Date().toTimeString().slice(0,5);
+  const oddsEl = document.getElementById('oddsPreview'); if (oddsEl) oddsEl.textContent = '-';
+  // 重置客户选择 UI
+  const bCsel = document.getElementById('bCsel');
+  const bCinp = document.getElementById('bC');
+  if (bCsel) {
+    bCsel.style.display = 'block';
+    // 保持已选中的客户
+    if (bCinp) { bCinp.style.display = 'none'; }
+  }
+  onPTChange();
+  document.getElementById('bOpt')?.focus();
+  switchTab('bets');
+}
+
+// ===== 判定逻辑 =====
+function judge(b, res, h, a) {
+  const amt = b.amt, odds = b.odds;
+  const isHt = PC[b.pt] && PC[b.pt].isHt;
+
+  // 全场玩法需要全场比分（kickoff/先开球不需要比分）
+  if (!isHt && b.pt !== 'kickoff') {
+    if (!isFullTimeSet(res)) return {res:'pending',pay:0};
+  }
+  // 上半场玩法需要上半场比分
+  if (isHt) {
+    if (!isHalfTimeSet(res)) return {res:'pending',pay:0};
+  }
+  // 角球相关需要角球数据
+  if (b.pt === 'corners' || b.pt === 'cah') {
+    if (res.cor == null) return {res:'pending',pay:0};
+  }
+  if (b.pt === 'htcou') {
+    if (res.htCor == null) return {res:'pending',pay:0};
+  }
+  if (b.pt === 'firstg' && res.firstGoal === '') return {res:'pending',pay:0};
+  if (b.pt === 'kickoff' && res.kickOff === '') return {res:'pending',pay:0};
+
+  const hg = res.hg, ag = res.ag, tg = hg+ag;
+  const isD = hg===ag, hW = hg>ag, aW = hg<ag, bS = hg>0&&ag>0;
+  const hth = res.htH||0, hta = res.htA||0, htg = hth+hta;
+
+  switch(b.pt) {
+    case '1x2': {
+      let win = b.opt===h+'胜' ? hW : b.opt==='平局' ? isD : aW;
+      return win ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+    }
+    case 'ah': return jAH(b, res, h, a, hW, aW, isD);
+    case 'ou': return jOU(b, tg, b.opt==='大球');
+    case 'cs': {
+      if (b.opt === '其他') {
+        const common = ['0-0','1-0','0-1','1-1','2-0','0-2','2-1','1-2','2-2','3-0','0-3'];
+        return common.includes(hg+'-'+ag) ? {res:'lose',pay:0} : {res:'win',pay:amt*odds};
+      }
+      const [hs,as] = b.opt.split('-').map(Number);
+      return (hg===hs&&ag===as) ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+    }
+    case 'btts': {
+      let win = b.opt==='是' ? bS : !bS;
+      return win ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+    }
+    case 'corners': return jOU(b, res.cor, b.opt==='角球大');
+    case 'cah': {
+      const hc2 = res.homeCorners||Math.floor(res.cor*0.6);
+      const ac2 = res.cor - hc2;
+      return jAH(b, {hg:hc2,ag:ac2}, h, a, hc2>ac2, hc2<ac2, false);
+    }
+    case 'firstg': {
+      if (hg===0&&ag===0) return b.opt==='无进球' ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+      return res.firstGoal === b.opt.replace('首球','') ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+    }
+    case 'htcs': {
+      const [hs,as] = b.opt.split('-').map(Number);
+      return (hth===hs&&hta===as) ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+    }
+    case 'ht1x2': {
+      const htHWin = hth>hta, htD = hth===hta, htAW = hth<hta;
+      let win = b.opt===h+'胜' ? htHWin : b.opt==='平局' ? htD : htAW;
+      return win ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+    }
+    case 'htah': {
+      return jAH(b, {hg:hth,ag:hta}, h, a, hth>hta, hth<hta, hth===hta);
+    }
+    case 'htou': {
+      return jOU(b, htg, b.opt==='上半场大球');
+    }
+    case 'htcah': {
+      // 上半场角球让球：用上半场角球数，主队上半场角球数估算为 htCor*0.6
+      const homeHtCor = res.homeHtCorners||Math.floor((res.htCor||0)*0.6);
+      const awayHtCor = (res.htCor||0) - homeHtCor;
+      return jAH(b, {hg:homeHtCor,ag:awayHtCor}, h, a, homeHtCor>awayHtCor, homeHtCor<awayHtCor, false);
+    }
+    case 'htcou': return jOU(b, res.htCor, b.opt==='上半场角球大');
+    case 'kickoff': {
+      // 只比较开球结果，别的都不管；不区分大小写，trim防空格
+      const ko = (res.kickOff || '').trim().toLowerCase();
+      const opt = (b.opt || '').trim().toLowerCase();
+      return ko === opt ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+    }
+    default: return {res:'lose',pay:0};
+  }
+}
+
+function jAH(b, r, h, a, hW, aW, isD) {
+  const amt = b.amt, odds = b.odds;
+  const isH = b.opt.includes(h);
+  if (b.hcSplit) {
+    const [lo,hi] = b.hcSplit;
+    const eL = r.hg - lo, eH = r.hg - hi;
+    const lW = isH ? (eL > r.ag) : (eL < r.ag), lP = eL === r.ag;
+    const hW2 = isH ? (eH > r.ag) : (eH < r.ag), hP = eH === r.ag;
+    if (lW&&hW2) return {res:'win',pay:amt*odds};
+    if (!lW&&!hW2&&!lP&&!hP) return {res:'lose',pay:0};
+    if ((lW&&hP)||(hW2&&lP)) return {res:'half-win',pay:amt*(odds+1)/2};
+    if ((!lW&&lP&&!hW2)||(!hW2&&hP&&!lW)) return {res:'half-lose',pay:amt/2};
+    return {res:'push',pay:amt};
+  } else {
+    if (b.hc === null) return {res:'push',pay:amt};
+    const eff = r.hg - b.hc;
+    const win = isH ? (eff > r.ag) : (eff < r.ag);
+    const push = eff === r.ag;
+    if (push) return {res:'push',pay:amt};
+    return win ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+  }
+}
+
+function jOU(b, actual, isOver) {
+  const amt = b.amt, odds = b.odds;
+  if (b.hcSplit) {
+    const [lo,hi] = b.hcSplit;
+    const lW = isOver ? (actual>lo) : (actual<lo), lP = actual===lo;
+    const hW2 = isOver ? (actual>hi) : (actual<hi), hP = actual===hi;
+    if (lW&&hW2) return {res:'win',pay:amt*odds};
+    if (!lW&&!hW2&&!lP&&!hP) return {res:'lose',pay:0};
+    if ((lW&&hP)||(hW2&&lP)) return {res:'half-win',pay:amt*(odds+1)/2};
+    if ((!lW&&lP&&!hW2)||(!hW2&&hP&&!lW)) return {res:'half-lose',pay:amt/2};
+    return {res:'push',pay:amt};
+  } else {
+    if (b.hc === null) return {res:'push',pay:amt};
+    const win = isOver ? (actual>b.hc) : (actual<b.hc);
+    const push = actual === b.hc;
+    if (push) return {res:'push',pay:amt};
+    return win ? {res:'win',pay:amt*odds} : {res:'lose',pay:0};
+  }
+}
+
+function resLabel(r) {
+  return r==='win'?'全赢':r==='half-win'?'半赢':r==='half-lose'?'半输':r==='push'?'走盘':r==='pending'?'待结算':'全输';
+}
+
+// ===== 比赛结果 =====
+function renderResult(m) {
+  const r = m.res || {};
+  let h = '<h3 style="color:#38bdf8;margin-bottom:14px">比赛结果</h3>';
+
+  // 上半场结果
+  h += '<div style="margin-bottom:10px"><h4 style="color:#f59e0b;font-size:13px;margin-bottom:8px">上半场结果</h4>';
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+  h += '<div style="flex:1;min-width:100px"><label style="font-size:13px;color:#94a3b8">'+m.h+' 上半场进球</label><input id="rHH" type="number" min="0" value="'+(r.htH==null?'':r.htH)+'" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:100px"><label style="font-size:13px;color:#94a3b8">'+m.a+' 上半场进球</label><input id="rHA" type="number" min="0" value="'+(r.htA==null?'':r.htA)+'" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:100px"><label style="font-size:13px;color:#94a3b8">上半场角球</label><input id="rHC" type="number" min="0" value="'+(r.htCor==null?'':r.htCor)+'" style="margin-top:4px"></div>';
+  h += '</div></div>';
+
+  // 全场结果
+  h += '<div style="margin-bottom:10px"><h4 style="color:#38bdf8;font-size:13px;margin-bottom:8px">全场结果（ optional，上半场结束后可先不填）</h4>';
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+  h += '<div style="flex:1;min-width:100px"><label style="font-size:13px;color:#94a3b8">'+m.h+' 全场进球</label><input id="rH" type="number" min="0" value="'+(r.hg==null?'':r.hg)+'" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:100px"><label style="font-size:13px;color:#94a3b8">'+m.a+' 全场进球</label><input id="rA" type="number" min="0" value="'+(r.ag==null?'':r.ag)+'" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:100px"><label style="font-size:13px;color:#94a3b8">总角球</label><input id="rC" type="number" min="0" value="'+(r.cor==null?'':r.cor)+'" style="margin-top:4px"></div>';
+  h += '</div></div>';
+
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px">';
+  h += '<div style="flex:1;min-width:140px"><label style="font-size:13px;color:#94a3b8">首球球队</label><select id="rFG" style="margin-top:4px;width:100%">';
+  h += '<option value="">未知</option><option value="'+m.h+'"'+(r.firstGoal===m.h?' selected':'')+'>'+m.h+'</option>';
+  h += '<option value="'+m.a+'"'+(r.firstGoal===m.a?' selected':'')+'>'+m.a+'</option>';
+  h += '<option value=""'+(r.firstGoal===''&&r.firstGoal!==undefined?' selected':'')+'>无进球</option></select></div>';
+  h += '<div style="flex:1;min-width:140px"><label style="font-size:13px;color:#94a3b8">先开球</label><select id="rKO" style="margin-top:4px;width:100%">';
+  h += '<option value="">未知</option><option value="'+m.h+'"'+(r.kickOff===m.h?' selected':'')+'>'+m.h+'</option>';
+  h += '<option value="'+m.a+'"'+(r.kickOff===m.a?' selected':'')+'>'+m.a+'</option></select></div>';
+  h += '</div>';
+
+  // 保存按钮：分两个
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  h += '<button class="btn" style="background:#f59e0b;color:#fff" onclick="saveHtResult(\''+m.id+'\')">仅保存上半场结果</button>';
+  h += '<button class="btn" style="background:#22c55e;color:#fff" onclick="saveFullResult(\''+m.id+'\')">保存全场结果</button>';
+  h += '<button class="btn" style="background:#ef4444;color:#fff" onclick="clearResult(\''+m.id+'\')">清除结果</button>';
+  h += '</div>';
+
+  // 提示
+  h += '<p style="color:#94a3b8;font-size:12px;margin-top:10px">提示：上半场结束后先点「仅保存上半场结果」，可结算上半场注单；全场结束后点「保存全场结果」结算全部注单。</p>';
+  return h;
+}
+
+function getSaveRes(m) {
+  return {
+    hg: getNum('rH'),
+    ag: getNum('rA'),
+    cor: getNum('rC'),
+    htH: getNum('rHH'),
+    htA: getNum('rHA'),
+    htCor: getNum('rHC'),
+    firstGoal: document.getElementById('rFG').value,
+    kickOff: document.getElementById('rKO').value,
+  };
+}
+
+function saveHtResult(id) {
+  const m = S.ms.find(x => x.id === id); if (!m) return;
+  const htH = getNum('rHH'), htA = getNum('rHA');
+  if (htH == null || htA == null) return alert('请填写上半场比分');
+  // 保留已有的全场结果
+  const existing = m.res || {};
+  m.res = {
+    ...existing,
+    htH, htA,
+    htCor: getNum('rHC'),
+    hg: existing.hg != null ? existing.hg : null,
+    ag: existing.ag != null ? existing.ag : null,
+    cor: existing.cor != null ? existing.cor : null,
+    firstGoal: document.getElementById('rFG').value || (existing.firstGoal||''),
+    kickOff: document.getElementById('rKO').value || (existing.kickOff||''),
+  };
+  save(); renderList(); alert('上半场结果已保存，上半场注单已可结算！');
+  switchTab('analysis');
+}
+
+function saveFullResult(id) {
+  const m = S.ms.find(x => x.id === id); if (!m) return;
+  const hg = getNum('rH'), ag = getNum('rA');
+  if (hg == null || ag == null) return alert('请填写全场比分');
+  const existing = m.res || {};
+  m.res = {
+    ...existing,
+    hg, ag,
+    cor: getNum('rC'),
+    firstGoal: document.getElementById('rFG').value || (existing.firstGoal||''),
+    kickOff: document.getElementById('rKO').value || (existing.kickOff||''),
+    htH: existing.htH != null ? existing.htH : getNum('rHH'),
+    htA: existing.htA != null ? existing.htA : getNum('rHA'),
+    htCor: existing.htCor != null ? existing.htCor : getNum('rHC'),
+  };
+  save(); renderList(); alert('全场结果已保存，全部注单已可结算！');
+  switchTab('analysis');
+}
+
+function clearResult(id) {
+  const m = S.ms.find(x => x.id === id); if (!m) return;
+  m.res = null; save(); renderList(); switchTab('result');
+}
+
+// ===== 盈亏分析 =====
+function renderAnalysis(m) {
+  if (!m.res) return '<h3 style="color:#38bdf8">盈亏分析</h3><p style="color:#f59e0b;padding:16px;background:#f59e0b22;border-radius:8px;margin-top:12px">请先填写比赛结果</p><button class="btn btn-a" style="margin-top:10px" onclick="switchTab(\'result\')">前往填写</button>';
+
+  const h = m.h, a = m.a, r = m.res;
+  const hasHt = isHalfTimeSet(r);
+  const hasFt = isFullTimeSet(r);
+
+  // 分两组（最新下单排最前）
+  const htBets = sortBetsNewest(m.bets.filter(b => PC[b.pt] && PC[b.pt].isHt));
+  const ftBets = sortBetsNewest(m.bets.filter(b => PC[b.pt] && !PC[b.pt].isHt));
+  const allBets = sortBetsNewest(m.bets);
+
+  let h2 = '<h3 style="color:#38bdf8;margin-bottom:14px">盈亏分析 — '+m.h+' vs '+m.a+'</h3>';
+
+  // 上半场结算区块（仅上半场玩法注单）
+  if (hasHt) {
+    h2 += renderSettleSection(m, htBets, r, h, a, '上半场结算（仅上半场玩法）', '#f59e0b');
+  }
+  // 全场结算区块（所有注单 = 上半场玩法 + 全场玩法）
+  if (hasFt) {
+    h2 += renderSettleSection(m, allBets, r, h, a, '全场结算（上下半场总和）', '#38bdf8');
+  }
+  // 待结算提示
+  if (hasHt && !hasFt) {
+    const pendingFt = ftBets.length;
+    if (pendingFt > 0) {
+      h2 += '<p style="color:#94a3b8;padding:10px;background:#94a3b822;border-radius:8px;margin:10px 0">还有 '+pendingFt+' 笔全场注单待结算（全场结果录入后可结算）</p>';
+    }
+  }
+
+  // 全部注单汇总（实时判定，不受旧 settlement 数据影响）
+  const allResults = m.bets.map(b => {
+    const j = judge(b, r, h, a);
+    const net = j.res === 'pending' ? null : b.amt - j.pay; // 庄家视角：正=庄家赚
+    return {...b, ...j, net};
+  });
+  const inc = allResults.reduce((s,r) => s+r.amt, 0);
+  const pay = allResults.filter(r => r.res!=='pending').reduce((s,r) => s+r.pay, 0);
+  const net = inc - pay; // 庄家总盈亏：正=庄家赚
+
+  const commission = inc * 0.03;          // 水钱：投注额 × 3%
+  const netAfterComm = net - commission;  // 税后净利润
+
+  h2 += '<h4 style="color:#38bdf8;margin:18px 0 10px">全部注单汇总</h4>';
+  h2 += '<div class="sg">';
+  h2 += '<div class="sc"><div class="v">'+inc.toFixed(0)+'</div><div class="l">总投注额</div></div>';
+  h2 += '<div class="sc"><div class="v" style="color:'+(pay>0?'#ef4444':'#22c55e')+'">'+pay.toFixed(0)+'</div><div class="l">已结算赔付</div></div>';
+  h2 += '<div class="sc"><div class="v" style="color:'+(net>=0?'#22c55e':'#ef4444')+'">'+(net>=0?'+':'')+net.toFixed(0)+'</div><div class="l">毛利润（未扣水钱）</div></div>';
+  h2 += '<div class="sc"><div class="v" style="color:#f59e0b">-'+commission.toFixed(0)+'</div><div class="l">水钱（投注额×3%）</div></div>';
+  h2 += '<div class="sc"><div class="v" style="color:'+(netAfterComm>=0?'#22c55e':'#ef4444')+';font-size:20px;font-weight:700">'+(netAfterComm>=0?'+':'')+netAfterComm.toFixed(0)+'</div><div class="l">税后净利润</div></div>';
+  h2 += '<div class="sc"><div class="v">'+(hasFt?'全部结算':'部分结算')+'</div><div class="l">结算状态</div></div>';
+  h2 += '</div>';
+
+  // 全部注单明细
+  h2 += '<h4 style="color:#38bdf8;margin:16px 0 10px">全部注单明细</h4>';
+  h2 += '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>盘口</th><th>金额</th><th>赔率</th><th>可赢</th><th>结果</th><th>赔付</th><th>盈亏</th></tr></thead><tbody>';
+  h2 += allResults.map(r => {
+    const pt = PC[r.pt]||{n:r.pt};
+    let hc = '-';
+    if (r.hc !== null) hc = r.hcSplit ? r.hcSplit.join('/') : r.hc;
+    const isPending = r.res === 'pending';
+    const tagClass = isPending ? 't-pn' : (r.res==='win'?'t-w':r.res==='lose'?'t-l':'t-p');
+    const winAmt = r.res==='pending' ? calcWinAmt(r.amt, r.odds) : (r.res==='win'||r.res==='half-win') ? (r.pay - r.amt).toFixed(0) : '-';
+    return '<tr><td>'+r.client+'</td><td>'+pt.n+(PC[r.pt]&&PC[r.pt].isHt?'<span class="ht-badge">上半场</span>':'')+'</td><td>'+r.opt+'</td><td>'+hc+'</td><td>'+r.amt+'</td><td>'+r.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
+      '<td><span class="tag '+tagClass+'">'+resLabel(r.res)+'</span></td>' +
+      '<td>'+(isPending?'-':(r.pay>0?r.pay.toFixed(1):'-'))+'</td>' +
+      '<td style="color:'+(r.net===null?'#94a3b8':(r.net>=0?'#22c55e':'#ef4444'))+';font-weight:600">'+(r.net===null?'待结算':(r.net>=0?'+':'')+r.net.toFixed(0))+'</td></tr>';
+  }).join('');
+  h2 += '</tbody></table>';
+
+  return h2;
+}
+
+function renderSettleSection(m, bets, res, h, a, title, color) {
+  if (!bets.length) return '';
+  // 实时判定，不用旧的 settlement 数据
+  const results = bets.map(b => {
+    const j = judge(b, res, h, a);
+    const net = j.res === 'pending' ? null : b.amt - j.pay; // 庄家视角：正=庄家赚
+    return {...b, ...j, net};
+  });
+  const inc = bets.reduce((s,b) => s+b.amt, 0);
+  const pay = results.reduce((s,r) => s+r.pay, 0);
+  const net = inc - pay; // 庄家总盈亏：正=庄家赚
+
+  let h2 = '<div style="margin:14px 0;padding:12px;border:1px solid '+color+'44;border-radius:10px">';
+  h2 += '<h4 style="color:'+color+';margin:0 0 10px">'+title+'</h4>';
+  h2 += '<div class="sg">';
+  h2 += '<div class="sc"><div class="v">'+inc.toFixed(0)+'</div><div class="l">投注额</div></div>';
+  h2 += '<div class="sc"><div class="v" style="color:'+(pay>0?'#ef4444':'#22c55e')+'">'+pay.toFixed(0)+'</div><div class="l">赔付</div></div>';
+  h2 += '<div class="sc"><div class="v" style="color:'+(net>=0?'#22c55e':'#ef4444')+'">'+(net>=0?'+':'')+net.toFixed(0)+'</div><div class="l">净利润</div></div>';
+  h2 += '</div>';
+  h2 += '<table style="margin-top:10px"><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>盘口</th><th>金额</th><th>赔率</th><th>可赢</th><th>结果</th><th>赔付</th><th>盈亏</th></tr></thead><tbody>';
+  h2 += results.map(r => {
+    const pt = PC[r.pt]||{n:r.pt};
+    let hc = '-';
+    if (r.hc !== null) hc = r.hcSplit ? r.hcSplit.join('/') : r.hc;
+    const winAmt = r.res==='pending' ? calcWinAmt(r.amt, r.odds) : (r.res==='win'||r.res==='half-win') ? (r.pay - r.amt).toFixed(0) : '-';
+    const tagClass = r.res==='pending' ? 't-pn' : (r.res==='win'?'t-w':r.res==='lose'?'t-l':'t-p');
+    return '<tr><td>'+r.client+'</td><td>'+pt.n+'</td><td>'+r.opt+'</td><td>'+hc+'</td><td>'+r.amt+'</td><td>'+r.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
+      '<td><span class="tag '+tagClass+'">'+resLabel(r.res)+'</span></td>' +
+      '<td>'+(r.pay>0?r.pay.toFixed(1):'-')+'</td>' +
+      '<td style="color:'+(r.net===null?'#94a3b8':(r.net>=0?'#22c55e':'#ef4444'))+';font-weight:600">'+(r.net===null?'待结算':(r.net>=0?'+':'')+r.net.toFixed(0))+'</td></tr>';
+  }).join('');
+  h2 += '</tbody></table></div>';
+  return h2;
+}
+
+// ===== 赛前模拟页面 =====
+function renderSim(m) {
+  if (!m) return '<div style="color:#94a3b8;padding:40px;text-align:center">请先选择比赛</div>';
+  let html = '';
+  html += '<div style="margin-bottom:16px"><b style="color:#e2e8f0">当前比赛：</b>'+m.h+' vs '+m.a+'</div>';
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">';
+  html += '<div style="flex:1;min-width:160px"><label style="font-size:13px;color:#94a3b8">最大比分</label><input id="simMax" type="number" min="1" max="10" value="5" style="margin-top:4px;width:100%"></div>';
+  html += '<div style="flex:1;min-width:160px"><label style="font-size:13px;color:#94a3b8">估算全场角球</label><input id="simCor" type="number" min="0" max="30" value="10" style="margin-top:4px;width:100%"></div>';
+  html += '';
+  html += '<div style="flex:1;min-width:160px"><label style="font-size:13px;color:#94a3b8">先开球（可选）</label><select id="simKO" style="margin-top:4px;width:100%"><option value="">未知</option><option value="'+m.h+'">'+m.h+'</option><option value="'+m.a+'">'+m.a+'</option></select></div>';
+  html += '</div>';
+  html += '<button class="btn" onclick="runSim(\'' + m.id + '\')" style="margin-bottom:16px">运行赛前模拟</button>';
+  html += '<div id="simResult"></div>';
+  return html;
+}
+
+// ===== 赛前模拟（全场：比分+角球+开球，统一总盈亏）=====
+function runSim(mid) {
+  const m = S.ms.find(x => x.id === mid); if (!m) return;
+  const max = parseInt(document.getElementById('simMax').value) || 5;
+  const baseCor = parseInt(document.getElementById('simCor')?.value) || 10;
+  const baseKO = document.getElementById('simKO')?.value || '';
+  const estHtCor = Math.floor(baseCor * 0.45);  // 上半场角球按全场×0.45估算
+  const h = m.h, a = m.a;
+
+  // 全场注单（上半场注单不纳入全场模拟）
+  const ftBets = m.bets.filter(b => {
+    const cfg = PC[b.pt];
+    return !cfg || !cfg.isHt;
+  });
+
+  if (!ftBets.length) {
+    const el = document.getElementById('simResult');
+    if (el) el.innerHTML = '<div style="color:#94a3b8;padding:40px;text-align:center">当前比赛没有全场注单，无法模拟</div>';
+    return;
+  }
+
+  let html = '';
+  html += '<h4 style="color:#38bdf8;margin:18px 0 10px;padding-bottom:6px;border-bottom:1px solid #38bdf844">⚽ 全场赛前模拟（总盈亏）</h4>';
+  html += '<p style="color:#94a3b8;font-size:12px;margin-bottom:8px">设定：全场角球='+baseCor+'（上半场估算='+estHtCor+'）；先开球='+(baseKO||'未知')+'。修改上方设定后重新运行可看不同场景。</p>';
+
+  const incFt = ftBets.reduce((s,b) => s+b.amt, 0);
+  let ftCells = '';
+  let ftBest = [-Infinity,''], ftWorst = [Infinity,''];
+
+  for (let hg = 0; hg <= max; hg++) {
+    for (let ag = 0; ag <= max; ag++) {
+      const htH = Math.floor(hg/2), htA = Math.floor(ag/2);
+      const r = { hg, ag, htH, htA, cor:baseCor, htCor:estHtCor, firstGoal:'', kickOff:baseKO };
+
+      // 实际总赔付：所有全场注单（无条件加 j.pay）
+      let totalPay = 0;
+      ftBets.forEach(b => {
+        const j = judge(b, r, h, a);
+        totalPay += j.pay;
+      });
+
+      const pnl = incFt - totalPay;
+
+      if (pnl > ftBest[0]) { ftBest[0] = pnl; ftBest[1] = hg+'-'+ag; }
+      if (pnl < ftWorst[0]) { ftWorst[0] = pnl; ftWorst[1] = hg+'-'+ag; }
+
+      const it = Math.min(1, Math.abs(pnl)/Math.max(1,incFt)*1.5);
+      const bg = pnl >= 0 ? 'rgba(34,197,94,'+(0.15+it*0.6)+')' : 'rgba(239,68,68,'+(0.15+it*0.6)+')';
+      const koStr = baseKO.replace(/'/g, "\\'");
+      ftCells += '<div class="pc" style="background:'+bg+';color:'+(pnl>=0?'#22c55e':'#ef4444')+'" title="'+hg+'-'+ag+': '+(pnl>=0?'+':'')+pnl.toFixed(0)+'" onclick="applySim('+hg+','+ag+','+baseCor+',\''+koStr+'\')"><div>'+hg+'-'+ag+'</div><div style="font-weight:700;font-size:11px">'+(pnl>=0?'+':'')+pnl.toFixed(0)+'</div></div>';
+    }
+  }
+
+  html += '<div class="sg" style="margin:8px 0"><div class="sc"><div class="v" style="color:#22c55e">'+ftBest[1]+'</div><div class="l">最佳（盈 '+ftBest[0].toFixed(0)+'）</div></div><div class="sc"><div class="v" style="color:#ef4444">'+ftWorst[1]+'</div><div class="l">最差（亏 '+ftWorst[0].toFixed(0)+'）</div></div><div class="sc"><div class="v">'+incFt.toFixed(0)+'</div><div class="l">总注额</div></div></div>';
+  html += '<div class="pnl-m">'+ftCells+'</div>';
+
+  // --- 敏感性分析：不同角球数量（按最佳比分）---
+  const [bestHg, bestAg] = ftBest[1].split('-').map(Number);
+  html += '<h5 style="color:#38bdf8;margin:16px 0 6px">敏感性：不同角球数量的总盈亏（按最佳比分 '+ftBest[1]+' 计算）</h5>';
+  html += '<div class="pnl-m">';
+  const corMax = Math.max(20, baseCor+10);
+  for (let cor = 0; cor <= corMax; cor++) {
+    const htCorEst = Math.floor(cor * 0.45);
+    const r = { hg:bestHg, ag:bestAg, htH:Math.floor(bestHg/2), htA:Math.floor(bestAg/2), cor, htCor:htCorEst, firstGoal:'', kickOff:baseKO };
+    let totalPay = 0;
+    ftBets.forEach(b => { const j = judge(b, r, h, a); totalPay += j.pay; });
+    const pnlCor = incFt - totalPay;
+    const it = Math.min(1, Math.abs(pnlCor)/Math.max(1,incFt)*1.5);
+    const bg = pnlCor >= 0 ? 'rgba(34,197,94,'+(0.15+it*0.6)+')' : 'rgba(239,68,68,'+(0.15+it*0.6)+')';
+    const isBase = cor === baseCor;
+    html += '<div class="pc" style="background:'+bg+';color:'+(pnlCor>=0?'#22c55e':'#ef4444')+';width:56px;height:38px;font-size:10px;border:'+(isBase?'2px solid #38bdf8':'none')+'" title="角球'+cor+'（上半场估算'+htCorEst+'）：'+(pnlCor>=0?'+':'')+pnlCor.toFixed(0)+'"><div>'+cor+'球</div><div style="font-weight:700">'+(pnlCor>=0?'+':'')+pnlCor.toFixed(0)+'</div></div>';
+  }
+  html += '</div>';
+  html += '<p style="color:#94a3b8;font-size:12px">蓝边框 = 当前设定值；上半场角球按全场×0.45估算</p>';
+
+  // --- 敏感性分析：不同先开球结果 ---
+  if (ftBets.some(b => b.pt === 'kickoff')) {
+    html += '<h5 style="color:#38bdf8;margin:16px 0 6px">敏感性：不同先开球的总盈亏（按最佳比分 '+ftBest[1]+'、角球 '+baseCor+' 计算）</h5>';
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+    [h, a, ''].forEach(team => {
+      const r = { hg:bestHg, ag:bestAg, htH:Math.floor(bestHg/2), htA:Math.floor(bestAg/2), cor:baseCor, htCor:estHtCor, firstGoal:'', kickOff:team };
+      let totalPay = 0;
+      ftBets.forEach(b => { const j = judge(b, r, h, a); totalPay += j.pay; });
+      const pnlKO = incFt - totalPay;
+      const label = team || '未知';
+      const isBase = team === baseKO;
+      const bg = pnlKO >= 0 ? '#22c55e22' : '#ef444422';
+      const border = pnlKO >= 0 ? '#22c55e' : '#ef4444';
+      html += '<div style="flex:1;min-width:120px;padding:12px;background:'+bg+';border:'+(isBase?'2px solid #38bdf8':'1px solid '+border)+';border-radius:8px;text-align:center"><div style="font-weight:600;margin-bottom:4px">'+label+'</div><div style="font-size:18px;font-weight:700;color:'+(pnlKO>=0?'#22c55e':'#ef4444')+'">'+(pnlKO>=0?'+':'')+pnlKO.toFixed(0)+'</div></div>';
+    });
+    html += '</div>';
+  }
+
+  const el = document.getElementById('simResult');
+  if (el) el.innerHTML = html;
+}
+
+
+
+
+// 填入上半场角球
+
+
+function applySim(hg, ag, cor, kickOff) {
+  const htCor = Math.floor(cor * 0.45);  // 上半场角球按全场×0.45估算
+  switchTab('result');
+  setTimeout(() => {
+    const e1 = document.getElementById('rH'), e2 = document.getElementById('rA');
+    if (e1) e1.value = hg;
+    if (e2) e2.value = ag;
+    const e3 = document.getElementById('rHH'), e4 = document.getElementById('rHA');
+    if (e3) e3.value = Math.floor(hg/2);
+    if (e4) e4.value = Math.floor(ag/2);
+    const e5 = document.getElementById('rC'), e6 = document.getElementById('rHC');
+    if (e5) e5.value = cor || '';
+    if (e6) e6.value = htCor;
+    const e7 = document.getElementById('rKO');
+    if (e7 && kickOff) e7.value = kickOff;
+  }, 100);
+}
+
+
+function applyCor(cor) {
+  switchTab('result');
+  setTimeout(() => {
+    const e5 = document.getElementById('rC'), e6 = document.getElementById('rHC');
+    if (e5) e5.value = cor;
+    if (e6) e6.value = htCor;
+  }, 100);
+}
+
+// ===== 历史记录 =====
+function renderHistory() {
+  let h = '<h3 style="color:#38bdf8;margin-bottom:14px">历史记录</h3>';
+  h += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end">';
+  h += '<div style="flex:1;min-width:180px"><label style="font-size:13px;color:#94a3b8">按比赛</label><select id="hfM" onchange="renderHistTable()" style="margin-top:4px;width:100%"><option value="">全部</option>'+S.ms.map(m => '<option value="'+m.id+'">'+m.h+' vs '+m.a+'</option>').join('')+'</select></div>';
+  h += '<div style="flex:1;min-width:180px"><label style="font-size:13px;color:#94a3b8">按客户</label><select id="hfC" onchange="renderHistTable()" style="margin-top:4px;width:100%"><option value="">全部</option>'+Array.from(S.cl).map(c => '<option value="'+c+'">'+c+'</option>').join('')+'</select></div>';
+  h += '<div style="flex:1;min-width:140px"><label style="font-size:13px;color:#94a3b8">起始日期</label><input id="hfF" type="date" onchange="renderHistTable()" style="margin-top:4px"></div>';
+  h += '<div style="flex:1;min-width:140px"><label style="font-size:13px;color:#94a3b8">结束日期</label><input id="hfT" type="date" onchange="renderHistTable()" style="margin-top:4px"></div>';
+  h += '</div>';
+  h += '<div id="histTable"></div>';
+  setTimeout(() => renderHistTable(), 50);
+  return h;
+}
+
+function renderHistTable() {
+  const el = document.getElementById('histTable'); if (!el) return;
+  const mid = document.getElementById('hfM')?.value;
+  const client = document.getElementById('hfC')?.value;
+  const dF = document.getElementById('hfF')?.value;
+  const dT = document.getElementById('hfT')?.value;
+  let bets = [];
+  S.ms.forEach(m => {
+    if (mid && m.id !== mid) return;
+    m.bets.forEach(b => {
+      if (client && b.client !== client) return;
+      if (dF && (b.createdAt||'') < dF) return;
+      if (dT && (b.createdAt||'') > dT+'T23:59:59') return;
+      bets.push({...b, mName:m.h+' vs '+m.a, mId:m.id, res:m.res});
+    });
+  });
+  bets = sortBetsNewest(bets);
+  if (bets.length === 0) { el.innerHTML = '<p style="color:#94a3b8;padding:16px">暂无记录</p>'; return; }
+  let table = '<table><thead><tr><th>比赛</th><th>客户</th><th>玩法</th><th>选项</th><th>金额</th><th>赔率</th><th>可赢</th><th>赛果</th><th>盈亏</th></tr></thead><tbody>';
+  table += bets.map(b => {
+    let pnl = '-';
+    if (b.res) {
+      const m2 = S.ms.find(x => x.id === b.mId);
+      if (m2) {
+        const j = judge(b, b.res, m2.h, m2.a);
+        if (j.res === 'pending') {
+          pnl = '<span style="color:#94a3b8">待结算</span>';
+        } else {
+          let net;
+          if (j.res==='win') net = -(j.pay-b.amt);
+          else if (j.res==='half-win') net = -(j.pay-b.amt);
+          else if (j.res==='half-lose') net = b.amt-j.pay;
+          else if (j.res==='push') net = 0;
+          else net = b.amt;
+          pnl = '<span style="color:'+(net>=0?'#22c55e':'#ef4444')+';font-weight:600">'+(net>=0?'+':'')+net.toFixed(0)+'</span>';
+        }
+      }
+    }
+    const pt = PC[b.pt]||{n:b.pt};
+    const resStr = b.res ? (isFullTimeSet(b.res) ? b.res.hg+'-'+b.res.ag : (isHalfTimeSet(b.res)?'上半场 '+b.res.htH+'-'+b.res.htA:'未结束')) : '未结束';
+    const winAmt = calcWinAmt(b.amt, b.odds);
+    return '<tr><td>'+b.mName+'</td><td>'+b.client+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td>'+b.amt+'</td><td>'+b.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td><td>'+resStr+'</td><td>'+pnl+'</td></tr>';
+  }).join('');  table += '</tbody></table>';
+  el.innerHTML = table;
+}
+
+// ===== 用户分析 =====
+function renderUser() {
+  if (!S.cl.size) return '<h3 style="color:#38bdf8">用户分析</h3><p style="color:#94a3b8;margin-top:12px">暂无客户数据</p>';
+  let h = '<h3 style="color:#38bdf8;margin-bottom:14px">用户分析</h3>';
+  h += '<div style="margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
+  h += '<div><label style="font-size:13px;color:#94a3b8">选择客户：</label>';
+  h += '<select id="uSel" onchange="renderUserDetail()" style="margin-top:4px;padding:7px 10px;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;min-width:180px">';
+  h += '<option value="">-- 请选择 --</option>'+Array.from(S.cl).sort().map(c => '<option value="'+c+'">'+c+'</option>').join('')+'</select></div>';
+  h += '</div>';
+  h += '<div id="uDetail"></div>';
+  return h;
+}
+
+function renderUserDetail() {
+  const client = document.getElementById('uSel')?.value;
+  const el = document.getElementById('uDetail');
+  if (!el || !client) { if(el) el.innerHTML = ''; return; }
+  let bets = [];
+  S.ms.forEach(m => {
+    m.bets.forEach(b => {
+      if (b.client === client) bets.push({...b, mName:m.h+' vs '+m.a, mTime:m.time, res:m.res, mId:m.id});
+    });
+  });
+  bets = sortBetsNewest(bets);
+  if (!bets.length) { el.innerHTML = '<p style="color:#94a3b8">该客户暂无注单</p>'; return; }
+
+  function calc(bs) {
+    let stake = 0, pay = 0;
+    bs.forEach(b => {
+      stake += b.amt;
+      if (b.res) {
+        const m2 = S.ms.find(x => x.id === b.mId);
+        if (m2) {
+          const j = judge(b, b.res, m2.h, m2.a);
+          pay += j.pay;
+        }
+      }
+    });
+    return {stake, pay, userNet:pay-stake, houseNet:stake-pay}; // userNet: 正=用户赢; houseNet: 正=庄家赚
+  }
+  const total = calc(bets);
+  const byM = {};
+  bets.forEach(b => { if (!byM[b.mName]) byM[b.mName] = []; byM[b.mName].push(b); });
+  const byD = {};
+  bets.forEach(b => { const d = (b.mTime||b.createdAt||'').slice(0,10); if (!byD[d]) byD[d] = []; byD[d].push(b); });
+  // 按周/按月已移除
+
+  function rTbl(data) {
+    const keys = Object.keys(data).sort();
+    if (!keys.length) return '';
+    let t = '<table><thead><tr><th>维度</th><th>注单</th><th>投注额</th><th>赔付</th><th>盈亏</th></tr></thead><tbody>';
+    t += keys.map(k => {
+      const c = calc(data[k]);
+      const pnl = c.houseNet; // 庄家视角盈亏
+      return '<tr><td>'+k+'</td><td>'+data[k].length+'</td><td>'+c.stake.toFixed(0)+'</td><td>'+c.pay.toFixed(0)+'</td><td style="color:'+(pnl>=0?'#22c55e':'#ef4444')+';font-weight:600">'+(pnl>=0?'+':'')+pnl.toFixed(0)+'</td></tr>';
+    }).join('');
+    t += '</tbody></table>';
+    return t;
+  }
+
+  let out = '';
+  const userNet = total.userNet; // 用户净赢（正=用户赢）
+  const houseNet = total.houseNet; // 庄家净赚（正=庄家赚）
+  out += '<div class="sg">';
+  out += '<div class="sc"><div class="v">'+bets.length+'</div><div class="l">总注单</div></div>';
+  out += '<div class="sc"><div class="v">'+total.stake.toFixed(0)+'</div><div class="l">总投注</div></div>';
+  out += '<div class="sc"><div class="v" style="color:#38bdf8">'+total.pay.toFixed(0)+'</div><div class="l">总赔付（含本金）</div></div>';
+  out += '<div class="sc"><div class="v" style="color:'+(houseNet>=0?'#22c55e':'#ef4444')+'">'+(houseNet>=0?'+':'')+houseNet.toFixed(0)+'</div><div class="l">净利润（庄家）</div></div>';
+  out += '</div>';
+  // ===== 余额功能 =====
+  if (!S.bl[client]) S.bl[client] = { credit: 0, txns: [] };
+  const bl = S.bl[client];
+  // 余额 = 累计充值 + 用户净赢（赢的钱）
+  const displayBalance = bl.credit + total.userNet;
+
+  out += '<h4 style="color:#f59e0b;margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid #f59e0b44">💰 用户余额（预付费）</h4>';
+  out += '<div class="sg" style="margin-bottom:10px">';
+  out += '<div class="sc"><div class="v" style="color:#38bdf8">'+bl.credit.toFixed(0)+'</div><div class="l">累计充值</div></div>';
+  out += '<div class="sc"><div class="v" style="color:#94a3b8">'+total.pay.toFixed(0)+'</div><div class="l">累计赔付给用户</div></div>';
+  out += '<div class="sc"><div class="v" style="color:'+(displayBalance>=0?'#22c55e':'#ef4444')+';font-size:20px;font-weight:700">'+(displayBalance>=0?'+':'')+displayBalance.toFixed(0)+'</div><div class="l">当前余额</div></div>';
+  out += '</div>';
+  // 充值记录
+  out += '<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap">';
+  out += '<div><label style="font-size:12px;color:#94a3b8">充值金额</label><input id="blAmt" type="number" min="1" placeholder="输入充值金额" style="margin-top:3px;width:130px"></div>';
+  out += '<div><label style="font-size:12px;color:#94a3b8">备注（可选）</label><input id="blNote" placeholder="如：20250618预付" style="margin-top:3px;width:150px"></div>';
+  out += '<button class="btn" style="background:#f59e0b;color:#fff" onclick="doRecharge(\'' + client + '\')">确认充值</button>';
+  out += '</div>';
+  // 充值明细
+  if (bl.txns.length) {
+    out += '<details style="margin-bottom:10px"><summary style="color:#94a3b8;font-size:13px;cursor:pointer">充值记录（'+bl.txns.length+'条）</summary>';
+    out += '<table style="margin-top:6px"><thead><tr><th>时间</th><th>金额</th><th>备注</th></tr></thead><tbody>';
+    out += bl.txns.slice().reverse().map(t => '<tr><td>'+t.at.slice(0,16).replace('T',' ')+'</td><td style="color:#38bdf8">+'+t.amt+'</td><td>'+t.note+'</td></tr>').join('');
+    out += '</tbody></table></details>';
+  }
+
+  out += '<h4 style="color:#38bdf8;margin:16px 0 10px">按场次</h4>'+rTbl(byM);
+  out += '<h4 style="color:#38bdf8;margin:16px 0 10px">按天</h4>'+rTbl(byD);
+  out += '<h4 style="color:#38bdf8;margin:16px 0 10px">全部注单</h4>';
+  out += '<table><thead><tr><th>比赛</th><th>玩法</th><th>选项</th><th>金额</th><th>赔率</th><th>赔付（含本金）</th><th>赛果</th><th>庄家盈亏</th></tr></thead><tbody>';
+  out += bets.map(b => {
+    let housePnlStr = '-';
+    let payStr = '-';
+    const resStr = b.res ? (isFullTimeSet(b.res) ? b.res.hg+'-'+b.res.ag : (isHalfTimeSet(b.res)?'上半场 '+b.res.htH+'-'+b.res.htA:'未结束')) : '未结束';
+    if (b.res) {
+      const m2 = S.ms.find(x => x.id === b.mId);
+      if (m2) {
+        const j = judge(b, b.res, m2.h, m2.a);
+        if (j.res === 'pending') {
+          housePnlStr = '<span style="color:#94a3b8">待结算</span>';
+          payStr = '<span style="color:#94a3b8">待结算</span>';
+        } else {
+          // 庄家视角：正=庄家赚
+          const housePnl = b.amt - j.pay;
+          housePnlStr = '<span style="color:'+(housePnl>=0?'#22c55e':'#ef4444')+';font-weight:600">'+(housePnl>=0?'+':'')+housePnl.toFixed(0)+'</span>';
+          payStr = j.pay.toFixed(0);
+        }
+      }
+    }
+    const pt = PC[b.pt]||{n:b.pt};
+    return '<tr><td>'+b.mName+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td>'+b.amt+'</td><td>'+b.odds+'</td><td>'+payStr+'</td><td>'+resStr+'</td><td>'+housePnlStr+'</td></tr>';
+  }).join('');
+  out += '</tbody></table>';
+  el.innerHTML = out;
+}
+
+// ===== 示例数据 =====
+function loadDemo(mid) {
+  const m = S.ms.find(x => x.id === mid); if (!m) return;
+  const h = m.h, a = m.a;
+  m.bets = [
+    {id:'b1',client:'C001',pt:'1x2',opt:h+'胜',amt:500,odds:2.1,hc:null,hcSplit:null,time:'14:00',createdAt:new Date().toISOString()},
+    {id:'b2',client:'C002',pt:'1x2',opt:'平局',amt:300,odds:3.2,hc:null,hcSplit:null,time:'14:02',createdAt:new Date().toISOString()},
+    {id:'b3',client:'C003',pt:'ah',opt:h+'让球',amt:800,odds:2.05,hc:0.75,hcSplit:[0.5,1],time:'14:05',createdAt:new Date().toISOString()},
+    {id:'b4',client:'C001',pt:'ou',opt:'大球',amt:400,odds:1.95,hc:2.5,hcSplit:null,time:'14:10',createdAt:new Date().toISOString()},
+    {id:'b5',client:'C004',pt:'cs',opt:'2-1',amt:600,odds:2.5,hc:null,hcSplit:null,time:'14:12',createdAt:new Date().toISOString()},
+    {id:'b6',client:'C001',pt:'ht1x2',opt:h+'胜',amt:300,odds:2.2,hc:null,hcSplit:null,time:'14:00',createdAt:new Date().toISOString()},
+    {id:'b7',client:'C002',pt:'htou',opt:'上半场大球',amt:200,odds:2.0,hc:1.5,hcSplit:null,time:'14:01',createdAt:new Date().toISOString()},
+  ];
+  ['C001','C002','C003','C004'].forEach(c => S.cl.add(c));
+  save(); renderList(); switchTab('bets'); alert('示例注单已载入！（含上半场玩法示例）');
+}
+
+// ===== 导入导出 =====
+// ===== 启动 =====
+
+// ===== 云同步配置 =====
+const API_BASE = location.origin;
+let _saveTimer = null;
+let _lastSyncTs = 0;
+let _lastVersion = 0;
+let _isSyncing = false;
+let _pollTimer = null;
+let _conflictRetries = 0;
+
+// ===== 存储（本地缓存 + 云同步）=====
+function save() {
+  try {
+    localStorage.setItem('fpnl3', JSON.stringify({
+      ms: S.ms,
+      cs: Array.from(S.cl),
+      bl: S.bl
+    }));
+  } catch(e) {}
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    saveToServer();
+  }, 500);
+}
+
+async function saveToServer() {
+  if (_isSyncing) return;
+  _isSyncing = true;
+  setSyncStatus('syncing');
+  try {
+    const resp = await fetch(API_BASE + '/api/data', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ms: S.ms, cs: Array.from(S.cl), bl: S.bl, _version: _lastVersion })
+    });
+    if (resp.ok) {
+      const r = await resp.json();
+      _lastSyncTs = r.lastModified || 0;
+      _lastVersion = r.version || 0;
+      _conflictRetries = 0;
+      setSyncStatus('online');
+    } else if (resp.status === 409) {
+      // 并发冲突：自动合并冲突数据
+      const r = await resp.json();
+      console.warn('数据冲突，自动合并...');
+      if (_conflictRetries < 3) {
+        _conflictRetries++;
+        _isSyncing = false;
+        await mergeConflict(r.serverData);
+        return saveToServer(); // 重试
+      } else {
+        setSyncStatus('conflict');
+        alert('数据同步冲突，无法自动解决。请刷新页面获取最新数据。');
+      }
+    } else {
+      setSyncStatus('error');
+    }
+  } catch(e) {
+    setSyncStatus('offline');
+  }
+  _isSyncing = false;
+}
+
+// 冲突合并：服务器数据优先于本地数据（但保留本地未提交的修改）
+async function mergeConflict(serverData) {
+  // 用服务器数据替换本地状态
+  S.ms = serverData.ms || [];
+  S.cl = new Set(serverData.cs || []);
+  S.bl = serverData.bl || {};
+  _lastVersion = serverData._version || 0;
+  _lastSyncTs = serverData.lastModified || 0;
+
+  // 保存到本地缓存
+  try {
+    localStorage.setItem('fpnl3', JSON.stringify({ ms: S.ms, cs: Array.from(S.cl), bl: S.bl }));
+  } catch(e) {}
+
+  // 刷新界面
+  renderList();
+  const cur = document.querySelector('#tabs .tab.act');
+  if (cur) switchTab(cur.getAttribute('dt'));
+  else if (S.ms.length) switchMatch(S.ms[0].id);
+}
+
+async function loadFromServer() {
+  try {
+    const resp = await fetch(API_BASE + '/api/data', { cache: 'no-store' });
+    if (resp.ok) {
+      const d = await resp.json();
+      _lastSyncTs = d.lastModified || 0;
+      _lastVersion = d._version || 0;
+      if (d.ms && d.ms.length > 0) {
+        S.ms = d.ms;
+        S.cl = new Set(d.cs || []);
+        S.bl = d.bl || {};
+        try {
+          localStorage.setItem('fpnl3', JSON.stringify({ ms: S.ms, cs: Array.from(S.cl), bl: S.bl }));
+        } catch(e) {}
+        setSyncStatus('online');
+        return true;
+      }
+      setSyncStatus('online');
+      return false;
+    }
+  } catch(e) {
+    setSyncStatus('offline');
+  }
+  return null;
+}
+
+function loadFromLocal() {
+  try {
+    const d = JSON.parse(localStorage.getItem('fpnl3')||'{}');
+    if (d.ms && d.ms.length > 0) {
+      S.ms = d.ms;
+      S.cl = new Set(d.cs || []);
+      S.bl = d.bl || {};
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+async function pollServerUpdate() {
+  if (_isSyncing) return;
+  try {
+    const resp = await fetch(API_BASE + '/api/ping', { cache: 'no-store' });
+    if (!resp.ok) return;
+    const d = await resp.json();
+    if (d._version > _lastVersion || d.lastModified > _lastSyncTs) {
+      setSyncStatus('syncing');
+      const loaded = await loadFromServer();
+      if (loaded) {
+        renderList();
+        const cur = document.querySelector('#tabs .tab.act');
+        if (cur) switchTab(cur.getAttribute('dt'));
+        else if (S.ms.length) switchMatch(S.ms[0].id);
+      }
+    }
+  } catch(e) {
+    setSyncStatus('offline');
+  }
+}
+
+function startPolling() {
+  if (_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = setInterval(pollServerUpdate, 15000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) pollServerUpdate();
+  });
+}
+
+function setSyncStatus(status) {
+  const el = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  if (!el || !txt) return;
+  const config = {
+    'online':   { color: '#22c55e', text: '已同步' },
+    'syncing':  { color: '#f59e0b', text: '同步中...' },
+    'offline':  { color: '#64748b', text: '离线模式' },
+    'error':    { color: '#ef4444', text: '同步失败' },
+    'conflict': { color: '#ef4444', text: '冲突！请刷新' }
+  };
+  const c = config[status] || config.offline;
+  el.style.background = c.color;
+  txt.textContent = c.text;
+}
+
+function load() {
+  loadFromLocal();
+}
+
+async function init() {
+  loadFromLocal();
+  setSyncStatus('syncing');
+  const serverLoaded = await loadFromServer();
+  if (serverLoaded === null) {
+    setSyncStatus('offline');
+  } else if (serverLoaded === false && !S.ms.length) {
+    S.ms.push({
+      id: 'm'+Date.now(),
+      h: '曼城', a: '利物浦', time: '',
+      pts: ['1x2','ah','ou','cs'],
+      bets: [], res: null
+    });
+    save();
+  }
+  renderPTChk(null);
+  renderList();
+  try {
+    const ui = JSON.parse(localStorage.getItem('fpnl3_ui')||'{}');
+    if (ui.cid && S.ms.find(m => m.id === ui.cid)) {
+      S.cid = ui.cid;
+      renderList();
+    } else if (S.ms.length) {
+      S.cid = S.ms[0].id;
+    }
+    const tab = ui.tab || 'setup';
+    switchTab(tab);
+  } catch(e) {
+    if (S.cid) switchTab('setup');
+    else if (S.ms.length) switchMatch(S.ms[0].id);
+  }
+  startPolling();
+}
+
+function exp() {
+  const d = {matches:S.ms, clients:Array.from(S.cl), balances:S.bl};
+  const b = new Blob([JSON.stringify(d,null,2)], {type:'application/json'});
+  const u = URL.createObjectURL(b);
+  const a = document.createElement('a');
+  a.href = u; a.download = 'fpnl_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(u);
+}
+
+function imp() {
+  const i = document.createElement('input');
+  i.type = 'file'; i.accept = '.json';
+  i.onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        if (d.matches) {
+          S.ms = d.matches;
+          S.cl = new Set(d.clients||[]);
+          S.bl = d.balances || {};
+          save(); renderList();
+          if (S.ms.length) switchMatch(S.ms[0].id);
+          alert('导入成功！');
+        } else alert('格式不正确');
+      } catch(err) { alert('解析失败：'+err.message); }
+    };
+    r.readAsText(f);
+  };
+  i.click();
+}
+
+async function manualSync() {
+  setSyncStatus('syncing');
+  const loaded = await loadFromServer();
+  if (loaded) {
+    renderList();
+    const cur = document.querySelector('#tabs .tab.act');
+    if (cur) switchTab(cur.getAttribute('dt'));
+    else if (S.ms.length) switchMatch(S.ms[0].id);
+  } else if (loaded === null) {
+    alert('网络连接失败，当前为离线模式');
+    setSyncStatus('offline');
+  } else {
+    setSyncStatus('online');
+    alert('已是最新数据');
+  }
+}
+
+init();
+
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(e) {
+      console.log('SW registration failed:', e);
+    });
+  });
+}
+</script>
+</body>
+</html>
