@@ -483,50 +483,89 @@ async function startOCR() {
 
 // ===== 解析全部赔率 =====
 function parseAllOdds(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  // 预处理：统一分隔符，合并断行
+  const raw = text.replace(/\t/g, '  ').replace(/\r/g, '\n');
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const result = { '1x2': [], ah: [], ou: [], cs: [] };
 
+  // 灵活的赔率数字：1-2位小数（容忍OCR漏小数点的情况）
+  const ODDS = '(\\d+(?:\\.\\d{1,2})?)';
+  const LINE_NO = '([-+]?\\d+(?:\\.\\d)?)'; // 盘口如 -0.5, +1, 2.5
+
   for (const line of lines) {
-    // 3个小数: 可能是独赢或水位
-    const trio = line.match(/(\d+\.\d{2})\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
-    if (trio) {
-      const v1 = parseFloat(trio[1]), v2 = parseFloat(trio[2]), v3 = parseFloat(trio[3]);
-      if (v1 > 1.2 && v1 < 50 && v2 > 1.2 && v2 < 50 && v3 > 1.2 && v3 < 50) {
+    // 跳过明显不是赔率的行
+    if (/^[A-Za-z\s]{4,}$/.test(line) && !/\d/.test(line)) continue;
+    if (/^(时间|日期|比赛|联赛|Time|Date|Match)/i.test(line)) continue;
+
+    // ---- 波胆优先 ----
+    const csM = line.match(/(\d+\s*[-:]\s*\d+)\s+(\d+(?:\.\d{1,2})?)/);
+    if (csM) {
+      const score = csM[1].replace(/\s+/g, '');
+      const ov = parseFloat(csM[2]);
+      if (ov > 1 && ov < 999) { result.cs.push({ score, odds: ov }); continue; }
+    }
+
+    // "其他"（波胆）
+    if (/其他/.test(line)) {
+      const om = line.match(/其他\s*(?:一切)?\s*(\d+(?:\.\d{1,2})?)/);
+      if (om && parseFloat(om[1]) > 1) { result.cs.push({ score: '其他', odds: parseFloat(om[1]) }); continue; }
+    }
+
+    // ---- 尝试匹配盘口+2个水位 ----
+    const ahRaw = line.match(new RegExp(LINE_NO + '\\s+' + ODDS + '\\s+' + ODDS));
+    if (ahRaw) {
+      const lv = parseFloat(ahRaw[1]);
+      const ho = parseFloat(ahRaw[2]);
+      const ao = parseFloat(ahRaw[3]);
+      if (Math.abs(lv) <= 10 && ho > 0.3 && ho < 3.0 && ao > 0.3 && ao < 3.0) {
+        // 判断大小球 vs 让球
+        if (/[OoUu大小]/i.test(line)) {
+          result.ou.push({ line: lv, over: ho, under: ao });
+        } else {
+          result.ah.push({ line: lv, home: ho, away: ao });
+        }
+        continue;
+      }
+    }
+
+    // ---- 尝试匹配3个赔率(独赢) ----
+    const trioRaw = line.match(new RegExp(ODDS + '\\s+' + ODDS + '\\s+' + ODDS));
+    if (trioRaw) {
+      const v1 = parseFloat(trioRaw[1]), v2 = parseFloat(trioRaw[2]), v3 = parseFloat(trioRaw[3]);
+      // 独赢：3个数都在 1.0~50 之间
+      if (v1 > 1.0 && v1 < 50 && v2 > 1.0 && v2 < 50 && v3 > 1.0 && v3 < 50) {
         result['1x2'].push({ home: v1, draw: v2, away: v3 });
-      } else if (v1 <= 2.0 && v2 <= 2.0 && v3 <= 2.0) {
-        const pre = line.match(/([-+]?\d+\.?\d*)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
-        if (pre && Math.abs(parseFloat(pre[1])) <= 10) {
-          if (line.match(/[OoUu大小]/)) result.ou.push({ line: parseFloat(pre[1]), over: v1, under: v2 });
-          else result.ah.push({ line: parseFloat(pre[1]), home: v1, away: v2 });
+        continue;
+      }
+    }
+
+    // ---- 尝试2个赔率(标准水位) ----
+    const pairRaw = line.match(new RegExp(ODDS + '\\s+' + ODDS));
+    if (pairRaw && !ahRaw && !trioRaw) {
+      const p1 = parseFloat(pairRaw[1]), p2 = parseFloat(pairRaw[2]);
+      if (p1 > 0.3 && p1 < 3.0 && p2 > 0.3 && p2 < 3.0) {
+        // 前面可能有一个盘口被 OCR 漏掉了，尝试在行首找
+        const pre = line.match(new RegExp(LINE_NO + '\\s*'));
+        const lv = pre ? parseFloat(pre[1]) : null;
+        if (lv !== null && Math.abs(lv) <= 10) {
+          if (/[OoUu大小]/i.test(line)) result.ou.push({ line: lv, over: p1, under: p2 });
+          else result.ah.push({ line: lv, home: p1, away: p2 });
         }
       }
-      continue;
-    }
-    // 盘口+水位: -0.5 0.90 0.95
-    const ahM = line.match(/([-+]?\d+\.?\d*)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
-    if (ahM) {
-      const lv = parseFloat(ahM[1]), ho = parseFloat(ahM[2]), ao = parseFloat(ahM[3]);
-      if (Math.abs(lv) <= 10 && ho > 0.5 && ho < 2.5 && ao > 0.5 && ao < 2.5) {
-        if (line.match(/[OoUu大小]/)) result.ou.push({ line: lv, over: ho, under: ao });
-        else result.ah.push({ line: lv, home: ho, away: ao });
-      }
-    }
-    // 波胆
-    const csM = line.match(/(\d+\s*[-:]\s*\d+)\s+(\d+\.?\d{0,2})/);
-    if (csM) {
-      const score = csM[1].replace(/\s+/g, ''), ov = parseFloat(csM[2]);
-      if (ov > 1 && ov < 999) result.cs.push({ score, odds: ov });
     }
   }
-  // 其他
-  for (const line of lines) {
-    const om = line.match(/其他\s+(\d+\.?\d{0,2})/);
-    if (om) { const ov = parseFloat(om[1]); if (ov > 1) result.cs.push({ score: '其他', odds: ov }); }
-  }
-  result.ah = dedup(result.ah); result.ou = dedup(result.ou); result.cs = dedupCs(result.cs);
+
+  // 去重
+  result['1x2'] = dedup1X2(result['1x2']);
+  result.ah = dedupAH(result.ah);
+  result.ou = dedupOU(result.ou);
+  result.cs = dedupCs(result.cs);
   return result;
 }
 function dedup(arr) { const s=new Set(); return arr.filter(x=>{const k=JSON.stringify(x);if(s.has(k))return false;s.add(k);return true;}); }
+function dedup1X2(arr) { const s=new Set(); return arr.filter(x=>{const k=x.home.toFixed(2)+'|'+x.draw.toFixed(2)+'|'+x.away.toFixed(2);if(s.has(k))return false;s.add(k);return true;}); }
+function dedupAH(arr) { const s=new Set(); return arr.filter(x=>{const k=String(x.line)+'|'+x.home.toFixed(2)+'|'+x.away.toFixed(2);if(s.has(k))return false;s.add(k);return true;}); }
+function dedupOU(arr) { const s=new Set(); return arr.filter(x=>{const k=String(x.line)+'|'+x.over.toFixed(2)+'|'+x.under.toFixed(2);if(s.has(k))return false;s.add(k);return true;}); }
 function dedupCs(arr) { const s=new Set(); return arr.filter(x=>{if(s.has(x.score))return false;s.add(x.score);return true;}); }
 
 // ===== 赔率总览 =====
@@ -628,14 +667,42 @@ async function doOCRSave() {
     remaining -= betsPerClient[selected[i]];
   }
 
-  // 生成注单
+  // 生成注单 — 每个客户每注都不同，客户之间也不重复
+  // 构建赔率池：多轮洗牌确保足够多样化
+  let betPool = [];
+  while (betPool.length < n) {
+    const round = [...all].sort(() => Math.random() - 0.5);
+    betPool = betPool.concat(round);
+  }
+
   const used = new Set(); const gen = []; let betIdx = 0;
+  let poolIdx = 0; // 赔率池消耗位置
+
   for (const client of selected) {
     used.add(client);
+    const clientGot = new Set(); // 该客户已分配的注单类型
+
     for (let j = 0; j < betsPerClient[client]; j++) {
-      // 加权随机选取赔率
-      const r = Math.random() * totalW; let acc = 0, chosen = all[0];
-      for (const o of all) { acc += o.weight; if (r <= acc) { chosen = o; break; } }
+      // 从池中取一个该客户还没有的类型
+      let chosen = null;
+      for (let attempt = 0; attempt < betPool.length && !chosen; attempt++) {
+        const cand = betPool[(poolIdx + attempt) % betPool.length];
+        const key = cand.pt + '|' + cand.opt + (cand.hc !== undefined ? '|' + cand.hc : '');
+        if (!clientGot.has(key)) {
+          chosen = cand;
+          clientGot.add(key);
+          poolIdx = (poolIdx + attempt + 1) % betPool.length;
+        }
+      }
+      // 如果池中找不到该客户没选过的，从原始选项中补
+      if (!chosen) {
+        const fresh = all.filter(o => {
+          const k = o.pt + '|' + o.opt + (o.hc !== undefined ? '|' + o.hc : '');
+          return !clientGot.has(k);
+        });
+        chosen = fresh.length ? fresh[Math.floor(Math.random() * fresh.length)] : all[Math.floor(Math.random() * all.length)];
+        clientGot.add(chosen.pt + '|' + chosen.opt + (chosen.hc !== undefined ? '|' + chosen.hc : ''));
+      }
 
       // 金额：波胆特殊处理
       const rf = Math.min(1, 1 / Math.max(0.3, chosen.odds - 0.5));
