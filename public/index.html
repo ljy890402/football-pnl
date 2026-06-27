@@ -90,6 +90,8 @@ tr:hover{background:#1e293b}
 .admin-only{display:none}.role-admin .admin-only{display:unset}
 .role-admin .admin-only-btn{display:inline-block}.role-finance .admin-only-btn{display:none}
 .role-admin .admin-only-flex{display:flex}.role-finance .admin-only-flex{display:none}
+.tab-admin{display:none}.role-admin .tab-admin{display:inline-block}
+.role-finance .tab-admin-content{display:none}
 /* === 用户信息条 === */
 .user-bar{padding:8px 16px;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;font-size:12px;flex-shrink:0}
 .user-bar .uinfo{display:flex;align-items:center;gap:6px}
@@ -137,12 +139,12 @@ tr:hover{background:#1e293b}
   </div>
   <div class="main">
     <div class="tabs" id="tabs">
-      <div class="tab act" dt="setup">比赛设置</div>
-      <div class="tab" dt="bets">录入注单</div>
-      <div class="tab" dt="result">比赛结果</div>
+      <div class="tab act tab-admin" dt="setup">比赛设置</div>
+      <div class="tab tab-admin" dt="bets">录入注单</div>
+      <div class="tab tab-admin" dt="result">比赛结果</div>
       <div class="tab" dt="analysis">盈亏分析</div>
-      <div class="tab" dt="live">实时追踪</div>
-      <div class="tab" dt="settle">结算</div>
+      <div class="tab tab-admin" dt="live">实时追踪</div>
+      <div class="tab tab-admin" dt="settle">结算</div>
       <div class="tab" dt="sim">赛前模拟</div>
       <div class="tab" dt="history">历史记录</div>
       <div class="tab" dt="user">用户分析</div>
@@ -435,6 +437,11 @@ document.getElementById('tabs').addEventListener('click', e => {
 });
 
 function switchTab(dt) {
+  // 财务账户不能进入管理类标签
+  const adminTabs = ['setup','bets','result','live','settle'];
+  if (_auth && _auth.role !== 'admin' && adminTabs.includes(dt)) {
+    dt = 'analysis';
+  }
   document.querySelectorAll('#tabs .tab').forEach(t => t.classList.remove('act'));
   const ta = document.querySelector('#tabs .tab[dt="'+dt+'"]');
   if (ta) ta.classList.add('act');
@@ -455,6 +462,12 @@ function switchTab(dt) {
 // ===== 渲染面板 =====
 function renderPanel(tab, m) {
   const c = document.getElementById('mc');
+  // 财务账户不允许渲染管理类面板（双重保险）
+  const adminTabs = ['setup','bets','result','live','settle'];
+  if (_auth && _auth.role !== 'admin' && adminTabs.includes(tab)) {
+    c.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8"><p style="font-size:48px;margin-bottom:12px">🔒</p><p>当前账户为只读模式，无法访问此功能</p></div>';
+    return;
+  }
   switch(tab) {
     case 'setup':    c.innerHTML = renderSetup(m); break;
     case 'bets':     c.innerHTML = renderBets(m); setTimeout(()=>onPTChange(), 50); break;
@@ -1801,7 +1814,7 @@ async function init() {
     } else if (S.ms.length) {
       S.cid = S.ms[0].id;
     }
-    const tab = ui.tab || 'setup';
+    const tab = ui.tab || (_auth && _auth.role !== 'admin' ? 'analysis' : 'setup');
     switchTab(tab);
   } catch(e) {
     if (S.cid) switchTab('setup');
