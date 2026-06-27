@@ -485,8 +485,31 @@ async function startOCR() {
 function parseAllOdds(text) {
   // 预处理：统一分隔符，合并断行
   const raw = text.replace(/\t/g, '  ').replace(/\r/g, '\n');
-  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  let lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const result = { '1x2': [], ah: [], ou: [], cs: [] };
+
+  // ==== 波胆预处理：矩阵布局下比分/赔率常被 OCR 拆成两行 ====
+  // 例： 1-0 (行1) + 51 (行2) → 合并为 "1-0 51"
+  const scoreRe = /^\s*(\d+)\s*[-:]\s*(\d+)\s*$/;   // 纯比分行: "1-0", "2:1"
+  const oddsOnlyRe = /^\s*(\d+(?:\.\d{1,2})?)\s*$/;  // 纯赔率行: "51", "9.8", "6.0"
+  const merged = [];
+  for (let i = 0; i < lines.length; i++) {
+    const sc = lines[i].match(scoreRe);
+    if (sc && i + 1 < lines.length) {
+      const nextOdds = lines[i + 1].match(oddsOnlyRe);
+      if (nextOdds) {
+        const ov = parseFloat(nextOdds[1]);
+        if (ov > 1 && ov < 999) {
+          // 合并为一行
+          merged.push(sc[1] + '-' + sc[2] + ' ' + nextOdds[1]);
+          i++; // 跳过赔率行
+          continue;
+        }
+      }
+    }
+    merged.push(lines[i]);
+  }
+  lines = merged;
 
   // 灵活的赔率数字：1-2位小数（容忍OCR漏小数点的情况）
   const ODDS = '(\\d+(?:\\.\\d{1,2})?)';
@@ -498,10 +521,19 @@ function parseAllOdds(text) {
     if (/^(时间|日期|比赛|联赛|Time|Date|Match)/i.test(line)) continue;
 
     // ---- 波胆优先 ----
+    // 同行格式: "1-0 51", "2-1 9.8"
     const csM = line.match(/(\d+\s*[-:]\s*\d+)\s+(\d+(?:\.\d{1,2})?)/);
     if (csM) {
       const score = csM[1].replace(/\s+/g, '');
       const ov = parseFloat(csM[2]);
+      if (ov > 1 && ov < 999) { result.cs.push({ score, odds: ov }); continue; }
+    }
+
+    // 矩阵多列格式: "1-0 51 15 13" → 取第一个赔率
+    const csMulti = line.match(/(\d+[-:]\d+)\s+(\d+(?:\.\d{1,2})?)(?:\s+\d+(?:\.\d{1,2})?)+/);
+    if (csMulti) {
+      const score = csMulti[1].replace(/\s+/g, '');
+      const ov = parseFloat(csMulti[2]);
       if (ov > 1 && ov < 999) { result.cs.push({ score, odds: ov }); continue; }
     }
 
