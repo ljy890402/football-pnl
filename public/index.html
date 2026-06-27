@@ -216,6 +216,15 @@ tr:hover{background:#1e293b}
           <span style="color:#64748b;font-size:12px">~</span>
           <input id="ocrBetMax" type="number" value="10000" min="100" step="50" style="width:70px">
         </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+          <label style="font-size:12px;color:#fbbf24;white-space:nowrap">下注方向比例</label>
+          <label style="font-size:11px;color:#22c55e;white-space:nowrap">主胜%</label>
+          <input id="ocrHomeRatio" type="number" value="50" min="0" max="100" style="width:50px" title="主队赢注单占比">
+          <label style="font-size:11px;color:#fbbf24;white-space:nowrap">平%</label>
+          <input id="ocrDrawRatio" type="number" value="30" min="0" max="100" style="width:50px" title="平局注单占比">
+          <label style="font-size:11px;color:#ef4444;white-space:nowrap">客胜%</label>
+          <input id="ocrAwayRatio" type="number" value="20" min="0" max="100" style="width:50px" title="客队赢注单占比">
+        </div>
         <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
           <label style="font-size:12px;color:#94a3b8;white-space:nowrap">每客户下注</label>
           <input id="ocrPerMin" type="number" value="2" min="1" max="20" style="width:60px">
@@ -518,41 +527,61 @@ function parseOUOdds(lines) { return parseAHOULines(lines, 'ou'); }
 function parseAHOULines(lines, subtype) {
   const result = [];
   // 盘口匹配：支持 3.5, -0.5, 3/3.5, 3.5/4 等格式
-  const LINE_RE = '([-+]?\\d+(?:\\.\\d{1,2})?(?:\\/\\d+(?:\\.\\d{1,2})?)?)';
-  const ODDS = '(\\d+(?:\\.\\d{1,2})?)';
-  const PAIR_RE = new RegExp('^\\s*' + LINE_RE + '\\s+' + ODDS + '\\s+' + ODDS + '\\s*$');
-  // 带汉字的单行匹配：大 3/3.5 0.83 | 小 3/3.5 0.99
-  const CHINESE_PAIRS = [
-    { re: /^.*?大\s+(\S+)\s+(\d+(?:\.\d{1,2})?)\s+小\s+\S+\s+(\d+(?:\.\d{1,2})?)\s*$/, over:1, handicap:2, under:3 },
-  ];
+  const LINE_PAT = '([-+]?\\d+(?:\\.\\d{1,2})?(?:\\/\\d+(?:\\.\\d{1,2})?)?)';
+  const ODDS_PAT = '(\\d+(?:\\.\\d{1,2})?)';
+  const PAIR_RE = new RegExp('^\\s*' + LINE_PAT + '\\s+' + ODDS_PAT + '\\s+' + ODDS_PAT + '\\s*$');
 
   for (const line of lines) {
     if (/^(时间|日期|比赛|联赛|场次|编号|Time|Date|Match|大\/小|大小)/i.test(line)) continue;
-    if (/(\d+[-:]\d+)/.test(line)) continue;
+    if (/(\d+[-:]\\d+)/.test(line)) continue;
 
-    // 尝试匹配 盘口 两赔率 格式
+    // 方式1：盘口+两赔率同行 如 "3/3.5 0.83 0.99"
     const m = line.match(PAIR_RE);
     if (m) {
-      const lv = m[1]; // 可能是 "3/3.5" 或 "3.5"
-      const o1 = parseFloat(m[2]), o2 = parseFloat(m[3]);
+      const lv = m[1]; const o1 = parseFloat(m[2]), o2 = parseFloat(m[3]);
       if (o1 >= 0.3 && o1 < 5 && o2 >= 0.3 && o2 < 5) {
         if (subtype === 'ou') result.push({ line: lv, over: o1, under: o2 });
         else result.push({ line: lv, home: o1, away: o2 });
       }
-      continue;
     }
+  }
 
-    // 匹配 "大 3/3.5 0.83" 或 "小 3/3.5 0.99" 单行
-    const singleM = line.match(/^[大小]\s+(\S+)\s+(\d+(?:\.\d{1,2})?)\s*$/);
-    if (singleM && subtype === 'ou') {
-      const side = line.trim().charAt(0); // '大' or '小'
-      const hc = singleM[1];
-      const oddsVal = parseFloat(singleM[2]);
-      if (oddsVal >= 0.3 && oddsVal < 5) {
-        if (side === '大') result.push({ line: hc, over: oddsVal, under: 0 });
-        else result.push({ line: hc, over: 0, under: oddsVal });
+  // 方式2：逐行扫描 "大/小 + 盘口 + 赔率" 或 两行模式（汉字+盘口 | 赔率）
+  if (subtype === 'ou' && result.length === 0) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^(时间|日期|比赛|联赛|场次|编号|Time|Date|Match|大\/小|大小)/i.test(line)) continue;
+      if (/(\d+[-:]\\d+)/.test(line)) continue;
+
+      // 同行: "大 3/3.5 0.83" 或 "小 3/3.5 0.99"
+      const singleM = line.match(/^[大小]\\s+(\\S+)\\s+(\\d+(?:\\.\\d{1,2})?)\\s*$/);
+      if (singleM) {
+        const side = line.trim().charAt(0);
+        const hc = singleM[1];
+        const oddsVal = parseFloat(singleM[2]);
+        if (oddsVal >= 0.3 && oddsVal < 5) {
+          if (side === '大') result.push({ line: hc, over: oddsVal, under: 0 });
+          else result.push({ line: hc, over: 0, under: oddsVal });
+        }
+        continue;
       }
-      continue;
+
+      // 两行模式：第一行 "大 3/3.5" 第二行 "0.83"
+      const labelM = line.match(/^[大小]\\s+(\\S+)\\s*$/);
+      if (labelM && i + 1 < lines.length) {
+        const nextLine = lines[i + 1];
+        const oddsM = nextLine.match(/^(\\d+(?:\\.\\d{1,2})?)\\s*$/);
+        if (oddsM) {
+          const side = line.trim().charAt(0);
+          const hc = labelM[1];
+          const oddsVal = parseFloat(oddsM[1]);
+          if (oddsVal >= 0.3 && oddsVal < 5) {
+            if (side === '大') result.push({ line: hc, over: oddsVal, under: 0 });
+            else result.push({ line: hc, over: 0, under: oddsVal });
+          }
+          i++; // skip the odds line
+        }
+      }
     }
   }
 
@@ -567,8 +596,7 @@ function parseAHOULines(lines, subtype) {
     }
     for (const k in byLine) {
       const v = byLine[k];
-      if (v.over > 0 && v.under > 0) merged.push(v);
-      else if (v.over > 0 && subtype === 'ou') merged.push(v); // 保留单边
+      if (v.over > 0 || v.under > 0) merged.push(v);
     }
     return dedupOU(merged.length ? merged : result);
   }
@@ -649,12 +677,16 @@ function updateBetPreview() {
   const numClients = parseInt(document.getElementById('ocrClientCount').value) || 8;
   const perMin = parseInt(document.getElementById('ocrPerMin').value) || 2;
   const perMax = parseInt(document.getElementById('ocrPerMax').value) || 8;
-  assignWeights(all); // sets o.weight on each option, weights sum to 1
+  assignWeights(all, parseInt(document.getElementById('ocrHomeRatio').value)||50, parseInt(document.getElementById('ocrDrawRatio').value)||30, parseInt(document.getElementById('ocrAwayRatio').value)||20);
   const cnt = {};
-  all.forEach(o => { const est = Math.round(n * o.weight); o.est = est; if (est > 0) { const k = ptLabel(o.pt); cnt[k] = (cnt[k] || 0) + est; } });
+  const dirCnt = { home:0, draw:0, away:0 };
+  all.forEach(o => { const est = Math.round(n * o.weight); o.est = est; if (est > 0) { const k = ptLabel(o.pt); cnt[k] = (cnt[k] || 0) + est; const d = classifyDirection(o); if (d) dirCnt[d] += est; } });
   const parts = Object.entries(cnt).map(([k,v]) => k + ' ' + v + '注').join(' | ');
   const total = Object.values(cnt).reduce((a,b) => a + b, 0);
-  el.innerHTML = '预计 ' + total + ' 注 / ' + numClients + ' 个客户 | ' + parts;
+  const homeRatio = parseInt(document.getElementById('ocrHomeRatio').value)||50;
+  const drawRatio = parseInt(document.getElementById('ocrDrawRatio').value)||30;
+  const awayRatio = parseInt(document.getElementById('ocrAwayRatio').value)||20;
+  el.innerHTML = '预计 ' + total + ' 注 / ' + numClients + ' 客户 | 主' + (dirCnt.home||0) + '注 平' + (dirCnt.draw||0) + '注 客' + (dirCnt.away||0) + '注 | ' + parts;
 }
 
 // ===== 智能生成注单 =====
@@ -671,7 +703,7 @@ async function doOCRSave() {
 
   const all = getOddsOptions(_ocrParsedOdds);
   if (!all.length) return alert('未识别到赔率');
-  assignWeights(all); // 低赔率占85%权重
+  assignWeights(all, parseInt(document.getElementById('ocrHomeRatio').value)||50, parseInt(document.getElementById('ocrDrawRatio').value)||30, parseInt(document.getElementById('ocrAwayRatio').value)||20);
 
   // 确保玩法启用
   for (const pt of new Set(all.map(o=>o.pt))) { if (!m.pts.includes(pt)) m.pts.push(pt); }
@@ -786,7 +818,9 @@ async function doOCRSave() {
 
   const stat = {};
   gen.forEach(b => { const k = ptLabel(b.pt); stat[k] = (stat[k] || 0) + 1; });
-  alert('✅ 已生成 ' + gen.length + ' 笔下注\n👤 ' + used.size + ' 个客户（每客户' + perMin + '-' + perMax + '注）\n📊 ' + Object.entries(stat).map(([k, v]) => k + v + '注').join(' | '));
+  const dirStat = { home:0, draw:0, away:0 };
+  gen.forEach(b => { const d = classifyDirection(b); if (d) dirStat[d]++; });
+  alert('✅ 已生成 ' + gen.length + ' 笔下注\n👤 ' + used.size + ' 个客户（每客户' + perMin + '-' + perMax + '注）\n🎯 主胜' + (dirStat.home||0) + '注 | 平局' + (dirStat.draw||0) + '注 | 客胜' + (dirStat.away||0) + '注\n📊 ' + Object.entries(stat).map(([k, v]) => k + v + '注').join(' | '));
 }
 
 // 辅助函数
@@ -810,36 +844,96 @@ function getOddsOptions(odds) {
   (odds.htcs||[]).forEach(o=>r.push({pt:'htcs',opt:o.score,odds:o.odds}));
   return r;
 }
-function assignWeights(arr) {
-  // 按 1/赔率 的累积占比来找 85%/15% 分割点
-  const sorted = [...arr].sort((a, b) => a.odds - b.odds);
-  const invOdds = sorted.map(o => 1 / o.odds);
-  const totalInv = invOdds.reduce((s, v) => s + v, 0);
-
-  // 找分割点：累计 1/odds 达到 85% 的位置
-  let cum = 0; let splitIdx = sorted.length;
-  for (let i = 0; i < sorted.length; i++) {
-    cum += invOdds[i];
-    if (cum / totalInv >= 0.85) { splitIdx = i + 1; break; }
+function classifyDirection(opt) {
+  // 判断某个选项属于主胜/平局/客胜方向
+  switch (opt.pt) {
+    case '1x2': case 'ht1x2':
+      if (opt.opt === '主胜') return 'home';
+      if (opt.opt === '平局') return 'draw';
+      return 'away';
+    case 'ah': case 'htah':
+      if (opt.opt === '主让球') return 'home';
+      return 'away';
+    case 'cs': case 'htcs': {
+      const parts = String(opt.opt).split('-');
+      if (parts.length === 2) {
+        const h = parseInt(parts[0]), a = parseInt(parts[1]);
+        if (h > a) return 'home';
+        if (h === a) return 'draw';
+        return 'away';
+      }
+      return 'draw';
+    }
+    default: return null; // ou/htou 大小球等方向中性
   }
-  splitIdx = Math.min(sorted.length, Math.max(1, splitIdx));
+}
 
-  const lowGroup = sorted.slice(0, splitIdx);
-  const highGroup = sorted.slice(splitIdx);
-  const lowInvSum = lowGroup.reduce((s, o) => s + 1 / o.odds, 0) || 1;
-  const highInvSum = highGroup.reduce((s, o) => s + 1 / o.odds, 0) || 1;
+function assignWeights(arr, homeRatio, drawRatio, awayRatio) {
+  // 先清空旧权重
+  arr.forEach(o => o.weight = 0);
 
-  sorted.forEach((o, i) => {
-    if (i < splitIdx) o.weight = 0.85 * (1 / o.odds) / lowInvSum;
-    else o.weight = 0.15 * (1 / o.odds) / highInvSum;
-  });
-  return 1;
+  // 正规化比例
+  const sum = (homeRatio || 0) + (drawRatio || 0) + (awayRatio || 0);
+  if (sum <= 0) { assignWeights(arr, 50, 30, 20); return; }
+  const hr = homeRatio / sum, dr = drawRatio / sum, ar = awayRatio / sum;
+
+  // 按方向分组
+  const groups = { home: [], draw: [], away: [], neutral: [] };
+  for (const o of arr) {
+    const d = classifyDirection(o);
+    if (d && groups[d]) groups[d].push(o);
+    else groups.neutral.push(o);
+  }
+
+  // 把中性选项（大小球等）均匀分到三个方向
+  if (groups.neutral.length) {
+    const nThird = Math.ceil(groups.neutral.length / 3);
+    for (let i = 0; i < groups.neutral.length; i++) {
+      if (i < nThird) groups.home.push(groups.neutral[i]);
+      else if (i < nThird * 2) groups.draw.push(groups.neutral[i]);
+      else groups.away.push(groups.neutral[i]);
+    }
+  }
+
+  // 计算每个方向的有效比例（跳过空方向的归一化）
+  const active = {};
+  if (groups.home.length) active.home = hr;
+  if (groups.draw.length) active.draw = dr;
+  if (groups.away.length) active.away = ar;
+  const activeSum = Object.values(active).reduce((s, v) => s + v, 0) || 1;
+  const adjHr = (active.home || 0) / activeSum;
+  const adjDr = (active.draw || 0) / activeSum;
+  const adjAr = (active.away || 0) / activeSum;
+
+  // 每个方向内部做 85/15 赔率权重分配
+  function _dirWeights(opts, targetRatio) {
+    if (!opts.length) return;
+    const sorted = [...opts].sort((a, b) => a.odds - b.odds);
+    const invOdds = sorted.map(o => 1 / o.odds);
+    const totalInv = invOdds.reduce((s, v) => s + v, 0);
+    let cum = 0, splitIdx = sorted.length;
+    for (let i = 0; i < sorted.length; i++) {
+      cum += invOdds[i];
+      if (cum / totalInv >= 0.85) { splitIdx = i + 1; break; }
+    }
+    splitIdx = Math.min(sorted.length, Math.max(1, splitIdx));
+    const lowInv = sorted.slice(0, splitIdx).reduce((s, o) => s + 1 / o.odds, 0) || 1;
+    const highInv = sorted.slice(splitIdx).reduce((s, o) => s + 1 / o.odds, 0) || 1;
+    sorted.forEach((o, i) => {
+      const raw = (i < splitIdx) ? 0.85 * (1 / o.odds) / lowInv : 0.15 * (1 / o.odds) / highInv;
+      o.weight = raw * targetRatio;
+    });
+  }
+
+  _dirWeights(groups.home, adjHr);
+  _dirWeights(groups.draw, adjDr);
+  _dirWeights(groups.away, adjAr);
 }
 function ptLabel(pt) { const m={cs:'波胆',htcs:'上半波胆','1x2':'独赢',ht1x2:'上半独赢',ah:'让球',htah:'上半让球',ou:'大小球',htou:'上半大小'}; return m[pt]||pt; }
 
 // 监听参数变化
 document.addEventListener('DOMContentLoaded', ()=>{
-  setTimeout(()=>{['ocrBetCount','ocrBetMin','ocrBetMax','ocrPerMin','ocrPerMax'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',updateBetPreview);});},1000);
+  setTimeout(()=>{['ocrBetCount','ocrBetMin','ocrBetMax','ocrPerMin','ocrPerMax','ocrHomeRatio','ocrDrawRatio','ocrAwayRatio'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',updateBetPreview);});},1000);
 });
 
 // ===== 数据 =====
