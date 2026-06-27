@@ -792,14 +792,15 @@ async function doOCRSave() {
         clientGot.add(chosen.pt + '|' + chosen.opt + (chosen.hc !== undefined ? '|' + chosen.hc : ''));
       }
 
-      // 金额：赔率反比 — 赔率小的下大注，赔率大的下小注
-      const BASE_ODDS = 5;
-      let rf = BASE_ODDS / Math.max(1.5, chosen.odds);
-      rf = rf * (0.8 + Math.random() * 0.4);
-      rf = Math.min(1, rf);
-      const csMax = Math.min(2000, maxA);
-      let amt = Math.round(csMax * rf / 100) * 100;
-      amt = Math.max(minA, Math.min(csMax, amt));
+      // 金额：在 minA~maxA 范围内随机，100的倍数。赔率低→偏高区间，但保留充分随机性
+      const oddsVal = Math.max(1.2, chosen.odds);
+      // 赔率反比映射到金额区间：低赔率偏向高金额，高赔率偏向低金额
+      const baseFraction = Math.pow(1 / oddsVal, 0.5);
+      const fraction = baseFraction * (0.45 + Math.random() * 1.1);
+      const clamped = Math.max(0, Math.min(1, fraction));
+      const rawAmt = minA + (maxA - minA) * clamped;
+      let amt = Math.round(rawAmt / 100) * 100;
+      amt = Math.max(minA, Math.min(maxA, amt));
 
       const bet = {
         id: 'b' + Date.now() + '_' + betIdx,
