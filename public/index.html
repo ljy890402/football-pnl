@@ -183,46 +183,37 @@ tr:hover{background:#1e293b}
 
 <!-- OCR 赔率识别弹窗 -->
 <div class="modal-o" id="ocrM" style="display:none">
-  <div class="modal" style="max-width:600px">
+  <div class="modal" style="max-width:700px">
     <h3 style="color:#38bdf8;margin-bottom:4px">📷 赔率 OCR 识别</h3>
-    <p id="ocrMatchLabel" style="font-size:12px;color:#94a3b8;margin-bottom:14px">请先在比赛列表中选择一场比赛</p>
-    <!-- 上传区 -->
-    <div id="ocrUpload" style="border:2px dashed #475569;border-radius:12px;padding:30px;text-align:center;cursor:pointer;margin-bottom:12px;transition:border-color .2s"
-         onclick="document.getElementById('ocrFile').click()"
-         ondragover="this.style.borderColor='#38bdf8';event.preventDefault()"
-         ondragleave="this.style.borderColor='#475569'"
-         ondrop="handleOCRDrop(event)">
-      <p style="font-size:40px;margin:0 0 8px">📸</p>
-      <p style="color:#94a3b8;font-size:13px;margin:0">点击选择赔率截图 或 拖拽到此处</p>
-      <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="handleOCRFile(event)">
-    </div>
-    <!-- 预览 -->
-    <div id="ocrPreview" style="display:none;margin-bottom:12px;position:relative">
-      <img id="ocrImg" style="width:100%;border-radius:8px;max-height:300px;object-fit:contain">
-      <button onclick="resetOCR()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:26px">✕</button>
-    </div>
-    <!-- 进度 -->
-    <div id="ocrProgress" style="display:none;margin-bottom:12px">
+    <p id="ocrMatchLabel" style="font-size:12px;color:#94a3b8;margin-bottom:4px">请先在比赛列表中选择一场比赛</p>
+    <p style="color:#64748b;font-size:11px;margin-bottom:10px">每个玩法单独上传截图，识别结果可叠加。上传新截图会替换对应玩法已有数据。</p>
+    <!-- 上传进度 -->
+    <div id="ocrProgress" style="display:none;margin-bottom:10px">
       <div style="background:#334155;border-radius:8px;height:6px;overflow:hidden">
         <div id="ocrBar" style="height:100%;background:linear-gradient(90deg,#38bdf8,#818cf8);width:0%;transition:width .3s"></div>
       </div>
       <p id="ocrStatus" style="color:#94a3b8;font-size:12px;margin:6px 0 0;text-align:center">准备识别...</p>
     </div>
-    <!-- 识别结果区：全部赔率 -->
+    <!-- 玩法上传按钮区 -->
+    <div style="margin-bottom:10px" id="ocrUploadGrid"></div>
+    <!-- 已识别赔率汇总 -->
+    <div id="ocrSummary" style="margin-bottom:10px">
+      <p style="color:#64748b;font-size:12px;text-align:center;padding:16px">点击上方按钮上传各类玩法的赔率截图</p>
+    </div>
+    <!-- 赔率明细 -->
+    <div id="ocrOddsOverview" style="margin-bottom:10px;display:none;max-height:300px;overflow-y:auto"></div>
+    <!-- 下注方案 -->
     <div id="ocrResult" style="display:none">
-      <!-- 赔率总览 -->
-      <div id="ocrOddsOverview" style="margin-bottom:12px"></div>
-      <!-- 下注方案 -->
-      <div style="background:#1e293b;border-radius:8px;padding:14px;margin-bottom:12px">
+      <div style="background:#1e293b;border-radius:8px;padding:14px;margin-bottom:10px">
         <h4 style="color:#fbbf24;margin:0 0 10px;font-size:14px">⚙️ 智能下注方案</h4>
         <p style="font-size:12px;color:#94a3b8;margin:0 0 8px">低赔率→多注高额 | 高赔率→少注低额</p>
-        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
           <label style="font-size:12px;color:#94a3b8;white-space:nowrap">总注单数</label>
-          <input id="ocrBetCount" type="number" value="30" min="5" max="100" style="width:80px">
-          <label style="font-size:12px;color:#94a3b8;white-space:nowrap;margin-left:8px">单注范围</label>
-          <input id="ocrBetMin" type="number" value="500" min="50" step="50" style="width:80px">
+          <input id="ocrBetCount" type="number" value="30" min="5" max="100" style="width:70px">
+          <label style="font-size:12px;color:#94a3b8;white-space:nowrap;margin-left:6px">单注范围</label>
+          <input id="ocrBetMin" type="number" value="500" min="50" step="50" style="width:70px">
           <span style="color:#64748b;font-size:12px">~</span>
-          <input id="ocrBetMax" type="number" value="10000" min="100" step="50" style="width:80px">
+          <input id="ocrBetMax" type="number" value="10000" min="100" step="50" style="width:70px">
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
           <label style="font-size:12px;color:#94a3b8;white-space:nowrap">每客户下注</label>
@@ -230,19 +221,15 @@ tr:hover{background:#1e293b}
           <span style="color:#64748b;font-size:12px">~</span>
           <input id="ocrPerMax" type="number" value="8" min="1" max="30" style="width:60px">
           <span style="color:#64748b;font-size:12px">注</span>
-          <span style="font-size:11px;color:#fbbf24;margin-left:4px">波胆≤2000/100倍数</span>
         </div>
         <div id="ocrBetPreview" style="font-size:12px;color:#94a3b8;margin-bottom:10px"></div>
       </div>
     </div>
     <!-- 操作按钮 -->
-    <div id="ocrBtns" style="display:none">
-      <button class="btn btn-a" style="width:100%;margin-bottom:6px" onclick="doOCRSave()">✅ 智能生成注单</button>
-      <button class="btn" style="width:100%;background:#ef4444;color:#fff" onclick="hideOCR()">取消</button>
-    </div>
-    <div id="ocrStartBtn">
-      <button class="btn btn-a" style="width:100%" onclick="startOCR()" id="ocrRunBtn" disabled>🔍 开始识别</button>
-      <button class="btn" style="width:100%;margin-top:6px" onclick="hideOCR()">取消</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-a" style="flex:1" onclick="doOCRSave()" id="ocrSaveBtn">✅ 智能生成注单</button>
+      <button class="btn" style="flex:1;background:#334155;color:#94a3b8" onclick="clearOCR()">🔄 清空重来</button>
+      <button class="btn" style="flex:1;background:#ef4444;color:#fff" onclick="hideOCR()">取消</button>
     </div>
   </div>
 </div>
@@ -363,312 +350,238 @@ async function verifyStoredAuth() {
 }
 
 // ===== 截图识别 OCR =====
-let _ocrImageData = null;
+const OCR_TYPES = [
+  { key:'1x2',  label:'独赢',     icon:'🏆', grp:'全场' },
+  { key:'ah',   label:'让球',     icon:'⚽', grp:'全场' },
+  { key:'ou',   label:'大小球',   icon:'⚪', grp:'全场' },
+  { key:'cs',   label:'波胆',     icon:'🎯', grp:'全场' },
+  { key:'ht1x2', label:'半场独赢', icon:'🏆', grp:'上半场' },
+  { key:'htah',  label:'半场让球', icon:'⚽', grp:'上半场' },
+  { key:'htou',  label:'半场大小', icon:'⚪', grp:'上半场' },
+  { key:'htcs',  label:'半场波胆', icon:'🎯', grp:'上半场' },
+];
 let _ocrParsedOdds = null;
+let _ocrRunning = false;
+let _ocrPendingType = null;
+
+function initOCRState() {
+  _ocrParsedOdds = {};
+  OCR_TYPES.forEach(t => { _ocrParsedOdds[t.key] = []; });
+}
 
 function showOCR() {
   const m = getCur();
   if (m) {
-    document.getElementById('ocrMatchLabel').textContent = '当前比赛: ' + m.h + ' vs ' + m.a;
-    document.getElementById('ocrMatchLabel').style.color = '#38bdf8';
+    document.getElementById('ocrMatchLabel').innerHTML = '当前比赛: <b style="color:#38bdf8">' + m.h + ' vs ' + m.a + '</b>';
   } else {
-    document.getElementById('ocrMatchLabel').textContent = '请先在左侧比赛列表中选择一场比赛';
-    document.getElementById('ocrMatchLabel').style.color = '#fbbf24';
+    document.getElementById('ocrMatchLabel').innerHTML = '<span style="color:#fbbf24">请先在左侧比赛列表中选择一场比赛</span>';
   }
   document.getElementById('ocrM').style.display = 'flex';
-  resetOCR();
+  if (!_ocrParsedOdds) initOCRState();
+  renderOCRUploadGrid();
+  renderOCRSummary();
+  renderOddsOverview();
+  updateBetPreview();
 }
 
-function hideOCR() {
-  document.getElementById('ocrM').style.display = 'none';
-}
+function hideOCR() { document.getElementById('ocrM').style.display = 'none'; }
 
-function resetOCR() {
-  _ocrImageData = null;
-  _ocrParsedOdds = null;
-  document.getElementById('ocrUpload').style.display = '';
-  document.getElementById('ocrPreview').style.display = 'none';
-  document.getElementById('ocrProgress').style.display = 'none';
+function clearOCR() {
+  initOCRState();
+  document.getElementById('ocrOddsOverview').style.display = 'none';
   document.getElementById('ocrResult').style.display = 'none';
-  document.getElementById('ocrBtns').style.display = 'none';
-  document.getElementById('ocrStartBtn').style.display = '';
-  document.getElementById('ocrRunBtn').disabled = true;
-  document.getElementById('ocrBar').style.width = '0%';
-  document.getElementById('ocrBar').style.background = 'linear-gradient(90deg,#38bdf8,#818cf8)';
-  document.getElementById('ocrStatus').textContent = '';
-  document.getElementById('ocrFile').value = '';
+  document.getElementById('ocrBetPreview').innerHTML = '';
+  renderOCRUploadGrid();
+  renderOCRSummary();
 }
 
-function handleOCRFile(e) {
+function renderOCRUploadGrid() {
+  const el = document.getElementById('ocrUploadGrid');
+  let h = '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  for (const t of OCR_TYPES) {
+    const cnt = _ocrParsedOdds[t.key] ? _ocrParsedOdds[t.key].length : 0;
+    const has = cnt > 0;
+    const brd = has ? '#22c55e' : '#475569';
+    h += '<button style="flex:1;min-width:115px;padding:10px 8px;border:2px dashed '+brd+';border-radius:8px;background:'+(has?'#22c55e11':'#1e293b')+';color:'+(has?'#22c55e':'#94a3b8')+';cursor:pointer;font-size:13px;transition:all .2s" onclick="triggerOCRUpload(\''+t.key+'\')" onmouseover="this.style.borderColor=\'#38bdf8\'" onmouseout="this.style.borderColor=\''+brd+'\'">'+t.icon+' '+t.label+(has?' <b>('+cnt+')</b>':'')+'</button>';
+  }
+  h += '</div>';
+  h += '<input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOCRUpload(event)">';
+  el.innerHTML = h;
+}
+
+function triggerOCRUpload(type) {
+  if (_ocrRunning) return alert('正在识别中，请等待完成');
+  _ocrPendingType = type;
+  document.getElementById('ocrFileInput').click();
+}
+
+async function handleOCRUpload(e) {
   const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    _ocrImageData = ev.target.result;
-    showOCRPreview();
-  };
-  reader.readAsDataURL(file);
-}
-
-function handleOCRDrop(e) {
-  e.preventDefault();
-  e.target.style.borderColor = '#475569';
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(ev) {
-    _ocrImageData = ev.target.result;
-    showOCRPreview();
-  };
-  reader.readAsDataURL(file);
-}
-
-function showOCRPreview() {
-  document.getElementById('ocrUpload').style.display = 'none';
-  document.getElementById('ocrPreview').style.display = '';
-  document.getElementById('ocrImg').src = _ocrImageData;
-  document.getElementById('ocrRunBtn').disabled = false;
-}
-
-async function startOCR() {
-  if (!_ocrImageData) return;
+  if (!file) { _ocrPendingType = null; return; }
+  const type = _ocrPendingType;
+  _ocrPendingType = null;
+  if (!type) return;
   const bar = document.getElementById('ocrBar');
   const status = document.getElementById('ocrStatus');
   document.getElementById('ocrProgress').style.display = '';
-  document.getElementById('ocrStartBtn').style.display = 'none';
   bar.style.width = '2%'; bar.style.background = 'linear-gradient(90deg,#38bdf8,#818cf8)';
   status.textContent = '正在初始化识别引擎...';
-
+  _ocrRunning = true;
+  const typeLabel = OCR_TYPES.find(t => t.key === type)?.label || type;
   try {
-    bar.style.width = '5%';
-    status.textContent = '正在加载语言数据（首次需下载约4MB）...';
-
-    const { data: { text } } = await Tesseract.recognize(_ocrImageData, 'eng', {
+    const imgUrl = URL.createObjectURL(file);
+    const { data: { text } } = await Tesseract.recognize(imgUrl, 'eng', {
       logger: m => {
         if (m.status === 'loading language traineddata') {
           bar.style.width = Math.round(15 + m.progress * 25) + '%';
           status.textContent = '下载语言数据 ' + Math.round(m.progress * 100) + '%...';
         } else if (m.status === 'recognizing text') {
           bar.style.width = Math.round(40 + m.progress * 55) + '%';
-          status.textContent = '识别文字 ' + Math.round(m.progress * 100) + '%...';
-        } else if (m.status === 'initializing api') {
-          bar.style.width = '40%'; status.textContent = '初始化...';
-        } else if (m.status === 'loading tesseract core') {
-          bar.style.width = '10%'; status.textContent = '加载引擎...';
+          status.textContent = '识别 ' + typeLabel + ': ' + Math.round(m.progress * 100) + '%...';
         }
       }
     });
-
-    bar.style.width = '100%'; status.textContent = '识别完成！';
-    console.log('OCR 原始文本:\n' + text);
-
-    _ocrParsedOdds = parseAllOdds(text);
-    console.log('解析全部赔率:', JSON.stringify(_ocrParsedOdds, null, 2));
-
-    renderOddsOverview(_ocrParsedOdds);
-    updateBetPreview();
-
-    document.getElementById('ocrProgress').style.display = 'none';
-    document.getElementById('ocrResult').style.display = '';
-    document.getElementById('ocrBtns').style.display = '';
-
-  } catch(e) {
-    console.error('OCR error:', e);
-    status.textContent = '❌ ' + (e.message || '识别失败');
+    URL.revokeObjectURL(imgUrl);
+    bar.style.width = '100%'; status.textContent = '解析 ' + typeLabel + '...';
+    console.log('OCR ['+type+'] raw:\n' + text);
+    const parsed = parseOddsByType(text, type);
+    console.log('OCR ['+type+'] parsed ' + parsed.length + ' items:', JSON.stringify(parsed));
+    if (!_ocrParsedOdds) initOCRState();
+    _ocrParsedOdds[type] = parsed;
+    setTimeout(() => { document.getElementById('ocrProgress').style.display = 'none'; }, 600);
+    renderOCRUploadGrid(); renderOCRSummary(); renderOddsOverview(); updateBetPreview();
+  } catch(err) {
+    console.error('OCR error:', err);
+    status.textContent = '❌ ' + (err.message || '识别失败');
     bar.style.background = '#ef4444';
-    document.getElementById('ocrStartBtn').style.display = '';
-    document.getElementById('ocrRunBtn').disabled = false;
+    setTimeout(() => { document.getElementById('ocrProgress').style.display = 'none'; }, 2000);
   }
+  _ocrRunning = false;
+  e.target.value = '';
 }
 
-// ===== 解析全部赔率 =====
-function parseAllOdds(text) {
+// ===== 按玩法类型解析 =====
+function parseOddsByType(text, type) {
   const raw = text.replace(/\t/g, '  ').replace(/\r/g, '\n');
-  const result = { '1x2': [], ah: [], ou: [], cs: [] };
-  console.log('=== OCR raw ===\n' + raw + '\n=== END ===');
-
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  const usedLines = new Set(); // 记录已被矩阵对齐消费的行
+  if (type === 'cs' || type === 'htcs') return parseCSOdds(lines);
+  if (type === '1x2' || type === 'ht1x2') return parse1X2Odds(lines);
+  if (type === 'ah' || type === 'htah') return parseAHOdds(lines);
+  if (type === 'ou' || type === 'htou') return parseOUOdds(lines);
+  return [];
+}
 
-  // ============================================================
-  //  阶段1: 矩阵对齐 → 比分行 + 下一行赔率 = 逐个配对
-  //  截图特征：黑色比分行在上，红色赔率行在下，每列一一对应
-  // ============================================================
-  const SCORE_RE = /(\d+)[-:](\d+)/g;    // 比分: "1-0", "2:1"
-  const NUM_RE = /(\d+(?:\.\d{1,2})?)/g; // 赔率: "51", "9.8", "15"
+function parseCSOdds(lines) {
+  const result = [];
+  const SCORE_RE = /(\d+)[-:](\d+)/g;
+  const NUM_RE = /(\d+(?:\.\d{1,2})?)/g;
+  const usedLines = new Set();
 
   for (let i = 0; i < lines.length - 1; i++) {
     if (usedLines.has(i)) continue;
-
-    // 从当前行提取所有比分
-    const scores = [];
-    let sm;
-    while ((sm = SCORE_RE.exec(lines[i])) !== null) {
-      scores.push(sm[1] + '-' + sm[2]);
-    }
-
-    // 从下一行提取所有数字（赔率 > 2.0）
-    const odds = [];
-    let nm;
-    while ((nm = NUM_RE.exec(lines[i + 1])) !== null) {
-      const v = parseFloat(nm[1]);
-      if (v > 2.0 && v < 200) odds.push(v);
-    }
-
-    // 对齐：比分数量 == 赔率数量 → 逐列配对
-    if (scores.length >= 2 && scores.length === odds.length) {
-      for (let j = 0; j < scores.length; j++) {
-        result.cs.push({ score: scores[j], odds: odds[j] });
-      }
-      usedLines.add(i);
-      usedLines.add(i + 1);
-      i++; // 跳过赔率行
-    }
-    // 特殊情况：比分数量是赔率的2倍（有时OCR把两个比分连在一起）
-    else if (scores.length >= 4 && scores.length === odds.length * 2) {
-      for (let j = 0; j < odds.length; j++) {
-        result.cs.push({ score: scores[j * 2], odds: odds[j] });
-        result.cs.push({ score: scores[j * 2 + 1], odds: odds[j] });
-      }
-      usedLines.add(i);
-      usedLines.add(i + 1);
-      i++;
-    }
+    const scores = []; let sm; SCORE_RE.lastIndex = 0;
+    while ((sm = SCORE_RE.exec(lines[i])) !== null) scores.push(sm[1] + '-' + sm[2]);
+    const odds = []; let nm; NUM_RE.lastIndex = 0;
+    while ((nm = NUM_RE.exec(lines[i + 1])) !== null) { const v = parseFloat(nm[1]); if (v > 2.0 && v < 500) odds.push(v); }
+    if (scores.length >= 2 && scores.length === odds.length) { for (let j = 0; j < scores.length; j++) result.push({ score: scores[j], odds: odds[j] }); usedLines.add(i); usedLines.add(i + 1); i++; }
+    else if (scores.length >= 4 && scores.length === odds.length * 2) { for (let j = 0; j < odds.length; j++) { result.push({ score: scores[j * 2], odds: odds[j] }); result.push({ score: scores[j * 2 + 1], odds: odds[j] }); } usedLines.add(i); usedLines.add(i + 1); i++; }
   }
 
-  // ============================================================
-  //  阶段2: 处理未被消费的行 → 内联配对 / 其他类型
-  // ============================================================
-  const remainingText = lines.filter((_, idx) => !usedLines.has(idx)).join('\n');
-
-  // 2a: 全局 inline score-odds 匹配（同行格式: "1-0 51"）
-  const csGlobalRe = /(\d+[-:]\d+)\s+(\d+(?:\.\d{1,2})?)/g;
-  let gMatch;
-  while ((gMatch = csGlobalRe.exec(remainingText)) !== null) {
-    const score = gMatch[1];
-    const ov = parseFloat(gMatch[2]);
-    if (ov > 2.0 && ov < 200) {
-      result.cs.push({ score, odds: ov });
-    }
+  const remText = lines.filter((_, idx) => !usedLines.has(idx)).join('\n');
+  const inlineRe = /(\d+[-:]\d+)\s+(\d+(?:\.\d{1,2})?)/g;
+  let im; while ((im = inlineRe.exec(remText)) !== null) { const ov = parseFloat(im[2]); if (ov > 2.0 && ov < 500) result.push({ score: im[1], odds: ov }); }
+  const otherRe = /其他\s*(\d+(?:\.\d{1,2})?)/g;
+  let om; while ((om = otherRe.exec(remText)) !== null) { const ov = parseFloat(om[1]); if (ov > 2.0) result.push({ score: '其他', odds: ov }); }
+  // Single-line fallback
+  for (const line of lines) {
+    const m = line.match(/^(\d+[-:]\d+)\s+(\d+(?:\.\d{1,2})?)$/);
+    if (m) { const ov = parseFloat(m[2]); if (ov > 2.0 && ov < 500) result.push({ score: m[1], odds: ov }); }
   }
-
-  // 2b: "其他"（波胆）
-  const otherRe = /其他\s*(?:一切)?\s*(\d+(?:\.\d{1,2})?)/g;
-  let otherM;
-  while ((otherM = otherRe.exec(remainingText)) !== null) {
-    const ov = parseFloat(otherM[1]);
-    if (ov > 2.0) result.cs.push({ score: '其他', odds: ov });
-  }
-
-  // ============================================================
-  //  阶段3: AH/OU/1X2 — 仅在剩余文本中检测，且CS不主导时
-  // ============================================================
-  const csCount = result.cs.length;
-  const ODDS = '(\\d+(?:\\.\\d{1,2})?)';
-  const LINE_NO = '([-+]?\\d+(?:\\.\\d)?)';
-  const remLines = lines.filter((_, idx) => !usedLines.has(idx));
-
-  // 统计候选
-  let ahC = 0, ouC = 0, x12C = 0;
-  for (const line of remLines) {
-    if (/(\d+[-:]\d+)/.test(line)) continue; // 跳过含比分行
-    if (/^[A-Za-z\s]{4,}$/.test(line) && !/\d/.test(line)) continue;
-    const ahm = line.match(new RegExp(LINE_NO + '\\s+' + ODDS + '\\s+' + ODDS));
-    if (ahm) {
-      const lv = parseFloat(ahm[1]), ho = parseFloat(ahm[2]), ao = parseFloat(ahm[3]);
-      if (Math.abs(lv) <= 10 && ho > 0.3 && ho < 3.0 && ao > 0.3 && ao < 3.0) {
-        /[OoUu大小]/i.test(line) ? ouC++ : ahC++;
-      }
-    }
-    const tm = line.match(new RegExp(ODDS + '\\s+' + ODDS + '\\s+' + ODDS));
-    if (tm) {
-      const v1 = parseFloat(tm[1]), v2 = parseFloat(tm[2]), v3 = parseFloat(tm[3]);
-      if (v1 > 1.0 && v1 < 50 && v2 > 1.0 && v2 < 50 && v3 > 1.0 && v3 < 50) x12C++;
-    }
-  }
-
-  const nonCSTotal = ahC + ouC + x12C;
-  const csDominant = (csCount >= 5 && csCount > nonCSTotal * 2);
-  console.log('CS=' + csCount + ' AH=' + ahC + ' OU=' + ouC + ' 1X2=' + x12C + ' dominant=' + csDominant);
-
-  if (!csDominant) {
-    for (const line of remLines) {
-      if (/(\d+[-:]\d+)/.test(line)) continue;
-      if (/^[A-Za-z\s]{4,}$/.test(line) && !/\d/.test(line)) continue;
-      if (/^(时间|日期|比赛|联赛|Time|Date|Match)/i.test(line)) continue;
-
-      const ahm = line.match(new RegExp(LINE_NO + '\\s+' + ODDS + '\\s+' + ODDS));
-      if (ahm) {
-        const lv = parseFloat(ahm[1]), ho = parseFloat(ahm[2]), ao = parseFloat(ahm[3]);
-        if (Math.abs(lv) <= 10 && ho > 0.3 && ho < 3.0 && ao > 0.3 && ao < 3.0) {
-          if (/[OoUu大小]/i.test(line)) result.ou.push({ line: lv, over: ho, under: ao });
-          else result.ah.push({ line: lv, home: ho, away: ao });
-          continue;
-        }
-      }
-      const tm = line.match(new RegExp(ODDS + '\\s+' + ODDS + '\\s+' + ODDS));
-      if (tm) {
-        const v1 = parseFloat(tm[1]), v2 = parseFloat(tm[2]), v3 = parseFloat(tm[3]);
-        if (v1 > 1.0 && v1 < 50 && v2 > 1.0 && v2 < 50 && v3 > 1.0 && v3 < 50) {
-          result['1x2'].push({ home: v1, draw: v2, away: v3 });
-          continue;
-        }
-      }
-      const pr = line.match(new RegExp(ODDS + '\\s+' + ODDS));
-      if (pr) {
-        const p1 = parseFloat(pr[1]), p2 = parseFloat(pr[2]);
-        if (p1 > 0.3 && p1 < 3.0 && p2 > 0.3 && p2 < 3.0) {
-          const pre = line.match(new RegExp(LINE_NO));
-          if (pre && Math.abs(parseFloat(pre[1])) <= 10) {
-            /[OoUu大小]/i.test(line) ? result.ou.push({ line: parseFloat(pre[1]), over: p1, under: p2 })
-              : result.ah.push({ line: parseFloat(pre[1]), home: p1, away: p2 });
-          }
-        }
-      }
-    }
-  }
-
-  // 去重
-  result['1x2'] = dedup1X2(result['1x2']);
-  result.ah = dedupAH(result.ah);
-  result.ou = dedupOU(result.ou);
-  result.cs = dedupCs(result.cs);
-  return result;
+  return dedupCs(result);
 }
-function dedup(arr) { const s=new Set(); return arr.filter(x=>{const k=JSON.stringify(x);if(s.has(k))return false;s.add(k);return true;}); }
-function dedup1X2(arr) { const s=new Set(); return arr.filter(x=>{const k=x.home.toFixed(2)+'|'+x.draw.toFixed(2)+'|'+x.away.toFixed(2);if(s.has(k))return false;s.add(k);return true;}); }
-function dedupAH(arr) { const s=new Set(); return arr.filter(x=>{const k=String(x.line)+'|'+x.home.toFixed(2)+'|'+x.away.toFixed(2);if(s.has(k))return false;s.add(k);return true;}); }
-function dedupOU(arr) { const s=new Set(); return arr.filter(x=>{const k=String(x.line)+'|'+x.over.toFixed(2)+'|'+x.under.toFixed(2);if(s.has(k))return false;s.add(k);return true;}); }
-function dedupCs(arr) { const s=new Set(); return arr.filter(x=>{if(s.has(x.score))return false;s.add(x.score);return true;}); }
+
+function parse1X2Odds(lines) {
+  const result = [];
+  for (const line of lines) {
+    if (/^(时间|日期|比赛|联赛|场次|编号|Time|Date|Match)/i.test(line)) continue;
+    if (/(\d+[-:]\d+)/.test(line)) continue;
+    const nums = line.match(/(\d+(?:\.\d{1,2})?)/g);
+    if (nums && nums.length === 3) { const v1 = parseFloat(nums[0]), v2 = parseFloat(nums[1]), v3 = parseFloat(nums[2]); if (v1 > 1.0 && v1 < 100 && v2 > 1.0 && v2 < 100 && v3 > 1.0 && v3 < 100) result.push({ home: v1, draw: v2, away: v3 }); }
+  }
+  return dedup1X2(result);
+}
+
+function parseAHOdds(lines) { return parseAHOULines(lines, 'ah'); }
+function parseOUOdds(lines) { return parseAHOULines(lines, 'ou'); }
+function parseAHOULines(lines, subtype) {
+  const result = [];
+  const LINE_RE = '([-+]?\\d+(?:\\.\\d{1,2})?)';
+  const ODDS = '(\\d+(?:\\.\\d{1,2})?)';
+  for (const line of lines) {
+    if (/^(时间|日期|比赛|联赛|场次|编号|Time|Date|Match)/i.test(line)) continue;
+    if (/(\d+[-:]\d+)/.test(line)) continue;
+    const m = line.match(new RegExp(LINE_RE + '\\s+' + ODDS + '\\s+' + ODDS));
+    if (m) { const lv = parseFloat(m[1]), o1 = parseFloat(m[2]), o2 = parseFloat(m[3]); if (Math.abs(lv) <= 10 && o1 > 0.3 && o1 < 5 && o2 > 0.3 && o2 < 5) { if (subtype === 'ou') result.push({ line: lv, over: o1, under: o2 }); else result.push({ line: lv, home: o1, away: o2 }); } }
+  }
+  return subtype === 'ou' ? dedupOU(result) : dedupAH(result);
+}
+
+function dedup(arr) { const s = new Set(); return arr.filter(x => { const k = JSON.stringify(x); if (s.has(k)) return false; s.add(k); return true; }); }
+function dedup1X2(arr) { const s = new Set(); return arr.filter(x => { const k = x.home.toFixed(2) + '|' + x.draw.toFixed(2) + '|' + x.away.toFixed(2); if (s.has(k)) return false; s.add(k); return true; }); }
+function dedupAH(arr) { const s = new Set(); return arr.filter(x => { const k = String(x.line) + '|' + x.home.toFixed(2) + '|' + x.away.toFixed(2); if (s.has(k)) return false; s.add(k); return true; }); }
+function dedupOU(arr) { const s = new Set(); return arr.filter(x => { const k = String(x.line) + '|' + x.over.toFixed(2) + '|' + x.under.toFixed(2); if (s.has(k)) return false; s.add(k); return true; }); }
+function dedupCs(arr) { const s = new Set(); return arr.filter(x => { if (s.has(x.score)) return false; s.add(x.score); return true; }); }
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ===== 赔率总览 =====
-function renderOddsOverview(odds) {
-  const c = document.getElementById('ocrOddsOverview'); let h = '';
-  if (odds['1x2'].length) {
-    h += '<div style="background:#1e293b;border-radius:8px;padding:12px;margin-bottom:8px"><h4 style="color:#38bdf8;margin:0 0 8px;font-size:13px">🏆 独赢 (1X2)</h4><table style="width:100%;font-size:12px;border-collapse:collapse"><tr style="color:#64748b"><td>#</td><td>主胜</td><td>平局</td><td>客胜</td></tr>';
-    odds['1x2'].forEach((o,i)=>h+='<tr><td style="color:#64748b">'+(i+1)+'</td><td style="color:#fbbf24">'+o.home.toFixed(2)+'</td><td style="color:#fbbf24">'+o.draw.toFixed(2)+'</td><td style="color:#fbbf24">'+o.away.toFixed(2)+'</td></tr>');
-    h += '</table></div>';
+// === 综合解析（用于赔率管理页OCR，尝试所有类型）===
+function parseAllOdds(text) {
+  const raw = text.replace(/\t/g, '  ').replace(/\r/g, '\n');
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  return {
+    '1x2': parse1X2Odds(lines),
+    ah: parseAHOdds(lines),
+    ou: parseOUOdds(lines),
+    cs: parseCSOdds(lines)
+  };
+}
+
+// ===== 汇总 + 概览 =====
+function renderOCRSummary() {
+  const el = document.getElementById('ocrSummary');
+  let total = 0; const parts = [];
+  for (const t of OCR_TYPES) { const n = _ocrParsedOdds[t.key] ? _ocrParsedOdds[t.key].length : 0; if (n > 0) { parts.push(t.icon + ' ' + t.label + ': <b style="color:#38bdf8">' + n + '</b>'); total += n; } }
+  if (total === 0) { el.innerHTML = '<p style="color:#64748b;font-size:12px;text-align:center;padding:16px">点击上方按钮上传各类玩法的赔率截图</p>'; document.getElementById('ocrResult').style.display = 'none'; return; }
+  el.innerHTML = '<div style="background:#1e293b;border-radius:8px;padding:10px 14px"><p style="color:#94a3b8;font-size:12px;margin:0">已识别 <b style="color:#22c55e">' + total + '</b> 项赔率：' + parts.join(' | ') + '</p></div>';
+  document.getElementById('ocrResult').style.display = '';
+}
+
+function renderOddsOverview() {
+  const el = document.getElementById('ocrOddsOverview');
+  let hasAny = false; for (const t of OCR_TYPES) { if (_ocrParsedOdds[t.key] && _ocrParsedOdds[t.key].length) { hasAny = true; break; } }
+  if (!hasAny) { el.style.display = 'none'; return; }
+  el.style.display = ''; let h = '';
+  const labels = { '1x2':'🏆 全场独赢', 'ah':'⚽ 全场让球', 'ou':'⚪ 全场大小', 'cs':'🎯 全场波胆', 'ht1x2':'🏆 上半独赢', 'htah':'⚽ 上半让球', 'htou':'⚪ 上半大小', 'htcs':'🎯 上半波胆' };
+  for (const t of OCR_TYPES) {
+    const data = _ocrParsedOdds[t.key] || []; if (!data.length) continue;
+    h += '<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:6px"><h4 style="color:#38bdf8;margin:0 0 6px;font-size:12px">'+labels[t.key]+' ('+data.length+'项)</h4>';
+    if (t.key === 'cs' || t.key === 'htcs') {
+      const sorted = [...data].sort((a,b) => a.odds - b.odds);
+      h += '<div style="display:flex;flex-wrap:wrap;gap:3px 8px">';
+      sorted.forEach(o => { const cl = o.odds < 7 ? '#22c55e' : o.odds < 12 ? '#fbbf24' : '#ef4444'; h += '<span style="font-size:11px;white-space:nowrap"><b style="color:'+cl+'">'+o.score+'</b> <span style="color:#94a3b8">'+o.odds.toFixed(2)+'</span></span>'; });
+      h += '</div>';
+    } else if (t.key === '1x2' || t.key === 'ht1x2') {
+      h += '<table style="width:100%;font-size:11px;border-collapse:collapse"><tr style="color:#64748b"><td>#</td><td>主胜</td><td>平局</td><td>客胜</td></tr>';
+      data.forEach((d,i) => h += '<tr><td style="color:#64748b">'+(i+1)+'</td><td style="color:#fbbf24">'+d.home.toFixed(2)+'</td><td style="color:#fbbf24">'+d.draw.toFixed(2)+'</td><td style="color:#fbbf24">'+d.away.toFixed(2)+'</td></tr>');
+      h += '</table>';
+    } else {
+      const isOU = t.key === 'ou' || t.key === 'htou';
+      h += '<table style="width:100%;font-size:11px;border-collapse:collapse"><tr style="color:#64748b"><td>盘口</td><td>'+(isOU?'大球':'主队')+'</td><td>'+(isOU?'小球':'客队')+'</td></tr>';
+      data.forEach(d => { const o1 = d.home !== undefined ? d.home : d.over; const o2 = d.away !== undefined ? d.away : d.under; h += '<tr><td style="color:#a78bfa;font-weight:600">'+(d.line>0?'+':'')+d.line+'</td><td style="color:#fbbf24">'+o1.toFixed(2)+'</td><td style="color:#fbbf24">'+o2.toFixed(2)+'</td></tr>'; });
+      h += '</table>';
+    }
+    h += '</div>';
   }
-  if (odds.ah.length) {
-    h += '<div style="background:#1e293b;border-radius:8px;padding:12px;margin-bottom:8px"><h4 style="color:#38bdf8;margin:0 0 8px;font-size:13px">⚽ 让球盘</h4><table style="width:100%;font-size:12px;border-collapse:collapse"><tr style="color:#64748b"><td>盘口</td><td>主队水位</td><td>客队水位</td></tr>';
-    odds.ah.forEach(o=>h+='<tr><td style="color:#a78bfa;font-weight:700">'+(o.line>0?'+':'')+o.line+'</td><td style="color:#fbbf24">'+o.home.toFixed(2)+'</td><td style="color:#fbbf24">'+o.away.toFixed(2)+'</td></tr>');
-    h += '</table></div>';
-  }
-  if (odds.ou.length) {
-    h += '<div style="background:#1e293b;border-radius:8px;padding:12px;margin-bottom:8px"><h4 style="color:#38bdf8;margin:0 0 8px;font-size:13px">⚪ 大小球</h4><table style="width:100%;font-size:12px;border-collapse:collapse"><tr style="color:#64748b"><td>盘口</td><td>大球</td><td>小球</td></tr>';
-    odds.ou.forEach(o=>h+='<tr><td style="color:#a78bfa;font-weight:700">'+o.line+'</td><td style="color:#fbbf24">'+o.over.toFixed(2)+'</td><td style="color:#fbbf24">'+o.under.toFixed(2)+'</td></tr>');
-    h += '</table></div>';
-  }
-  if (odds.cs.length) {
-    const sorted = [...odds.cs].sort((a,b)=>a.odds-b.odds);
-    h += '<div style="background:#1e293b;border-radius:8px;padding:12px;margin-bottom:8px"><h4 style="color:#38bdf8;margin:0 0 8px;font-size:13px">🎯 波胆 ('+sorted.length+'项)</h4><div style="display:flex;flex-wrap:wrap;gap:4px 8px">';
-    sorted.forEach(o=>{const cl=o.odds<7?'#22c55e':o.odds<12?'#fbbf24':'#ef4444';h+='<span style="font-size:12px;white-space:nowrap"><b style="color:'+cl+'">'+o.score+'</b> <span style="color:#94a3b8">'+o.odds.toFixed(2)+'</span></span>';});
-    h += '</div></div>';
-  }
-  const total = odds['1x2'].length+odds.ah.length+odds.ou.length+odds.cs.length;
-  if (!total) h='<div style="background:#1e293b;border-radius:8px;padding:16px;text-align:center"><p style="color:#ef4444;margin:0">未识别到赔率数据</p></div>';
-  c.innerHTML = h;
+  el.innerHTML = h;
 }
 
 // ===== 下注预览 =====
@@ -683,11 +596,11 @@ function updateBetPreview() {
   const totalW = assignWeights(all);
   const cnt = {};
   all.forEach(o => { o.est = Math.max(1, Math.round(n * o.weight / totalW)); const k = ptLabel(o.pt); cnt[k] = (cnt[k] || 0) + o.est; });
-  const parts = Object.entries(cnt).map(([k,v])=>k+' '+v+'注').join(' | ');
-  const total = Object.values(cnt).reduce((a,b)=>a+b,0);
+  const parts = Object.entries(cnt).map(([k,v]) => k + ' ' + v + '注').join(' | ');
+  const total = Object.values(cnt).reduce((a,b) => a + b, 0);
   const avgPer = Math.floor((perMin + perMax) / 2);
   const estClients = Math.max(1, Math.ceil(n / avgPer));
-  el.innerHTML = '预计 ' + total + ' 注 / ' + estClients + ' 个客户 | ' + parts + '<br><span style="color:#fbbf24">波胆金额≤2000，100倍数</span>';
+  el.innerHTML = '预计 ' + total + ' 注 / ' + estClients + ' 个客户 | ' + parts;
 }
 
 // ===== 智能生成注单 =====
@@ -785,7 +698,7 @@ async function doOCRSave() {
       rf = rf * (0.8 + Math.random() * 0.4); // ±20% 随机
       rf = Math.min(1, rf); // 不超过满额
       let amt;
-      if (chosen.pt === 'cs') {
+      if (chosen.pt === 'cs' || chosen.pt === 'htcs') {
         const csMax = Math.min(2000, maxA);
         amt = Math.round(csMax * rf / 100) * 100;
         amt = Math.max(minA, Math.min(csMax, amt));
@@ -817,17 +730,23 @@ async function doOCRSave() {
 // 辅助函数
 function getOddsOptions(odds) {
   const r = [];
-  odds['1x2'].forEach(o=>{r.push({pt:'1x2',opt:'主胜',odds:o.home});r.push({pt:'1x2',opt:'平局',odds:o.draw});r.push({pt:'1x2',opt:'客胜',odds:o.away});});
-  odds.ah.forEach(o=>{r.push({pt:'ah',opt:'主队',odds:o.home,hc:o.line});r.push({pt:'ah',opt:'客队',odds:o.away,hc:o.line});});
-  odds.ou.forEach(o=>{r.push({pt:'ou',opt:'大球',odds:o.over,hc:o.line});r.push({pt:'ou',opt:'小球',odds:o.under,hc:o.line});});
-  odds.cs.forEach(o=>r.push({pt:'cs',opt:o.score,odds:o.odds}));
+  // 全场
+  (odds['1x2']||[]).forEach(o=>{r.push({pt:'1x2',opt:'主胜',odds:o.home});r.push({pt:'1x2',opt:'平局',odds:o.draw});r.push({pt:'1x2',opt:'客胜',odds:o.away});});
+  (odds.ah||[]).forEach(o=>{r.push({pt:'ah',opt:'主队',odds:o.home,hc:o.line});r.push({pt:'ah',opt:'客队',odds:o.away,hc:o.line});});
+  (odds.ou||[]).forEach(o=>{r.push({pt:'ou',opt:'大球',odds:o.over,hc:o.line});r.push({pt:'ou',opt:'小球',odds:o.under,hc:o.line});});
+  (odds.cs||[]).forEach(o=>r.push({pt:'cs',opt:o.score,odds:o.odds}));
+  // 上半场
+  (odds['ht1x2']||[]).forEach(o=>{r.push({pt:'ht1x2',opt:'主胜',odds:o.home});r.push({pt:'ht1x2',opt:'平局',odds:o.draw});r.push({pt:'ht1x2',opt:'客胜',odds:o.away});});
+  (odds.htah||[]).forEach(o=>{r.push({pt:'htah',opt:'主队',odds:o.home,hc:o.line});r.push({pt:'htah',opt:'客队',odds:o.away,hc:o.line});});
+  (odds.htou||[]).forEach(o=>{r.push({pt:'htou',opt:'大球',odds:o.over,hc:o.line});r.push({pt:'htou',opt:'小球',odds:o.under,hc:o.line});});
+  (odds.htcs||[]).forEach(o=>r.push({pt:'htcs',opt:o.score,odds:o.odds}));
   return r;
 }
 function assignWeights(arr) {
   arr.forEach(o=>{o.weight=o.odds<=1.5?8:o.odds<=2?6:o.odds<=3?4:o.odds<=5?2:o.odds<=10?1:0.5;});
   return arr.reduce((s,o)=>s+o.weight,0);
 }
-function ptLabel(pt) { return pt==='cs'?'波胆':pt==='1x2'?'独赢':pt==='ah'?'让球':'大小球'; }
+function ptLabel(pt) { const m={cs:'波胆',htcs:'上半波胆','1x2':'独赢',ht1x2:'上半独赢',ah:'让球',htah:'上半让球',ou:'大小球',htou:'上半大小'}; return m[pt]||pt; }
 
 // 监听参数变化
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -1443,11 +1362,9 @@ function calcWinPreview() {
 // ===== 注单表格 =====
 function renderBetTable(bets, m) {
   const hasRes = m.res && (isFullTimeSet(m.res) || isHalfTimeSet(m.res));
-  let h = '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>盘口</th><th>金额</th><th>赔率</th><th>可赢</th><th>结算状态</th><th>操作</th></tr></thead><tbody>';
+  let h = '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>金额</th><th>赔率</th><th>可赢</th><th>结算状态</th><th>操作</th></tr></thead><tbody>';
   h += bets.map(b => {
     const pt = PC[b.pt] || {n:b.pt};
-    let hc = '-';
-    if (b.hc !== null) hc = b.hcSplit ? b.hcSplit.join('/') : b.hc;
     const winAmt = calcWinAmt(b.amt, b.odds);
     // 结算状态
     let settleStr = '';
@@ -1459,7 +1376,7 @@ function renderBetTable(bets, m) {
     } else {
       settleStr = '<button class="btn" style="background:#38bdf8;color:#fff;font-size:11px;padding:3px 8px" onclick="doSettleBet(\''+m.id+'\',\''+b.id+'\')">结算</button>';
     }
-    return '<tr><td>'+b.client+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td>'+hc+'</td><td>'+b.amt+'</td><td>'+b.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
+    return '<tr><td>'+b.client+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td>'+b.amt+'</td><td>'+b.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
       '<td>'+settleStr+'</td>' +
       '<td><button class="btn admin-only-btn" style="background:#ef4444;color:#fff;font-size:11px;padding:3px 8px" onclick="delBet(\''+m.id+'\',\''+b.id+'\')">删除</button>' +
       (b.settled ? '<button class="btn" style="background:#94a3b8;color:#fff;font-size:11px;padding:3px 8px;margin-left:4px" onclick="undoSettle(\''+m.id+'\',\''+b.id+'\')">撤销</button>' : '') +
@@ -2092,15 +2009,13 @@ function renderAnalysis(m) {
 
   // 全部注单明细
   h2 += '<h4 style="color:#38bdf8;margin:16px 0 10px">全部注单明细</h4>';
-  h2 += '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>盘口</th><th>金额</th><th>赔率</th><th>可赢</th><th>结果</th><th>赔付</th><th>盈亏</th></tr></thead><tbody>';
+  h2 += '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>金额</th><th>赔率</th><th>可赢</th><th>结果</th><th>赔付</th><th>盈亏</th></tr></thead><tbody>';
   h2 += allResults.map(r => {
     const pt = PC[r.pt]||{n:r.pt};
-    let hc = '-';
-    if (r.hc !== null) hc = r.hcSplit ? r.hcSplit.join('/') : r.hc;
     const isPending = r.res === 'pending';
     const tagClass = isPending ? 't-pn' : (r.res==='win'?'t-w':r.res==='lose'?'t-l':'t-p');
     const winAmt = r.res==='pending' ? calcWinAmt(r.amt, r.odds) : (r.res==='win'||r.res==='half-win') ? (r.pay - r.amt).toFixed(0) : '-';
-    return '<tr><td>'+r.client+'</td><td>'+pt.n+(PC[r.pt]&&PC[r.pt].isHt?'<span class="ht-badge">上半场</span>':'')+'</td><td>'+r.opt+'</td><td>'+hc+'</td><td>'+r.amt+'</td><td>'+r.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
+    return '<tr><td>'+r.client+'</td><td>'+pt.n+(PC[r.pt]&&PC[r.pt].isHt?'<span class="ht-badge">上半场</span>':'')+'</td><td>'+r.opt+'</td><td>'+r.amt+'</td><td>'+r.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
       '<td><span class="tag '+tagClass+'">'+resLabel(r.res)+'</span></td>' +
       '<td>'+(isPending?'-':(r.pay>0?r.pay.toFixed(1):'-'))+'</td>' +
       '<td style="color:'+(r.net===null?'#94a3b8':(r.net>=0?'#22c55e':'#ef4444'))+';font-weight:600">'+(r.net===null?'待结算':(r.net>=0?'+':'')+r.net.toFixed(0))+'</td></tr>';
@@ -2129,14 +2044,12 @@ function renderSettleSection(m, bets, res, h, a, title, color) {
   h2 += '<div class="sc"><div class="v" style="color:'+(pay>0?'#ef4444':'#22c55e')+'">'+pay.toFixed(0)+'</div><div class="l">赔付</div></div>';
   h2 += '<div class="sc"><div class="v" style="color:'+(net>=0?'#22c55e':'#ef4444')+'">'+(net>=0?'+':'')+net.toFixed(0)+'</div><div class="l">净利润</div></div>';
   h2 += '</div>';
-  h2 += '<table style="margin-top:10px"><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>盘口</th><th>金额</th><th>赔率</th><th>可赢</th><th>结果</th><th>赔付</th><th>盈亏</th></tr></thead><tbody>';
+  h2 += '<table style="margin-top:10px"><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>金额</th><th>赔率</th><th>可赢</th><th>结果</th><th>赔付</th><th>盈亏</th></tr></thead><tbody>';
   h2 += results.map(r => {
     const pt = PC[r.pt]||{n:r.pt};
-    let hc = '-';
-    if (r.hc !== null) hc = r.hcSplit ? r.hcSplit.join('/') : r.hc;
     const winAmt = r.res==='pending' ? calcWinAmt(r.amt, r.odds) : (r.res==='win'||r.res==='half-win') ? (r.pay - r.amt).toFixed(0) : '-';
     const tagClass = r.res==='pending' ? 't-pn' : (r.res==='win'?'t-w':r.res==='lose'?'t-l':'t-p');
-    return '<tr><td>'+r.client+'</td><td>'+pt.n+'</td><td>'+r.opt+'</td><td>'+hc+'</td><td>'+r.amt+'</td><td>'+r.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
+    return '<tr><td>'+r.client+'</td><td>'+pt.n+'</td><td>'+r.opt+'</td><td>'+r.amt+'</td><td>'+r.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
       '<td><span class="tag '+tagClass+'">'+resLabel(r.res)+'</span></td>' +
       '<td>'+(r.pay>0?r.pay.toFixed(1):'-')+'</td>' +
       '<td style="color:'+(r.net===null?'#94a3b8':(r.net>=0?'#22c55e':'#ef4444'))+';font-weight:600">'+(r.net===null?'待结算':(r.net>=0?'+':'')+r.net.toFixed(0))+'</td></tr>';
