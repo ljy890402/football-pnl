@@ -223,6 +223,14 @@ tr:hover{background:#1e293b}
           <span style="color:#64748b;font-size:12px">~</span>
           <input id="ocrBetMax" type="number" value="10000" min="100" step="50" style="width:80px">
         </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+          <label style="font-size:12px;color:#94a3b8;white-space:nowrap">每客户下注</label>
+          <input id="ocrPerMin" type="number" value="2" min="1" max="20" style="width:60px">
+          <span style="color:#64748b;font-size:12px">~</span>
+          <input id="ocrPerMax" type="number" value="8" min="1" max="30" style="width:60px">
+          <span style="color:#64748b;font-size:12px">注</span>
+          <span style="font-size:11px;color:#fbbf24;margin-left:4px">波胆≤2000/100倍数</span>
+        </div>
         <div id="ocrBetPreview" style="font-size:12px;color:#94a3b8;margin-bottom:10px"></div>
       </div>
     </div>
@@ -526,16 +534,20 @@ function renderOddsOverview(odds) {
 // ===== 下注预览 =====
 function updateBetPreview() {
   const el = document.getElementById('ocrBetPreview');
-  if (!_ocrParsedOdds) { el.textContent = ''; return; }
+  if (!_ocrParsedOdds) { el.innerHTML = ''; return; }
   const all = getOddsOptions(_ocrParsedOdds);
-  if (!all.length) { el.textContent = '无可用赔率'; return; }
+  if (!all.length) { el.innerHTML = '无可用赔率'; return; }
   const n = parseInt(document.getElementById('ocrBetCount').value) || 30;
+  const perMin = parseInt(document.getElementById('ocrPerMin').value) || 2;
+  const perMax = parseInt(document.getElementById('ocrPerMax').value) || 8;
   const totalW = assignWeights(all);
   const cnt = {};
   all.forEach(o => { o.est = Math.max(1, Math.round(n * o.weight / totalW)); const k = ptLabel(o.pt); cnt[k] = (cnt[k] || 0) + o.est; });
   const parts = Object.entries(cnt).map(([k,v])=>k+' '+v+'注').join(' | ');
   const total = Object.values(cnt).reduce((a,b)=>a+b,0);
-  el.textContent = '预计 ' + total + ' 注 | ' + parts;
+  const avgPer = Math.floor((perMin + perMax) / 2);
+  const estClients = Math.max(1, Math.ceil(n / avgPer));
+  el.innerHTML = '预计 ' + total + ' 注 / ' + estClients + ' 个客户 | ' + parts + '<br><span style="color:#fbbf24">波胆金额≤2000，100倍数</span>';
 }
 
 // ===== 智能生成注单 =====
@@ -546,6 +558,8 @@ async function doOCRSave() {
   const n = parseInt(document.getElementById('ocrBetCount').value) || 30;
   const minA = parseInt(document.getElementById('ocrBetMin').value) || 500;
   const maxA = parseInt(document.getElementById('ocrBetMax').value) || 10000;
+  const perMin = parseInt(document.getElementById('ocrPerMin').value) || 2;
+  const perMax = parseInt(document.getElementById('ocrPerMax').value) || 8;
 
   const all = getOddsOptions(_ocrParsedOdds);
   if (!all.length) return alert('未识别到赔率');
@@ -554,26 +568,80 @@ async function doOCRSave() {
   // 确保玩法启用
   for (const pt of new Set(all.map(o=>o.pt))) { if (!m.pts.includes(pt)) m.pts.push(pt); }
 
-  const clients = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N'];
-  const used = new Set(); const gen = [];
+  // 40个中文客户名
+  const CLIENTS = [
+    '张伟','王芳','李娜','刘洋','陈静','杨帆','赵敏','黄磊','周杰','吴鑫',
+    '徐亮','孙悦','马超','朱婷','胡明','郭靖','林黛','何强','罗浩','梁宇',
+    '宋雨','郑爽','谢安','韩冰','唐艺','冯志','董明','萧然','曹真','袁莉',
+    '邓超','许晴','傅雷','沈逸','曾华','彭博','吕良','苏瑾','蒋涛','蔡康'
+  ];
 
-  for (let i = 0; i < n; i++) {
-    const r = Math.random() * totalW; let acc = 0, chosen = all[0];
-    for (const o of all) { acc += o.weight; if (r <= acc) { chosen = o; break; } }
-    const client = clients[Math.floor(Math.random()*clients.length)]; used.add(client);
-    const rf = Math.min(1, 1 / Math.max(0.3, chosen.odds - 0.5));
-    let amt = minA + Math.floor((maxA - minA) * rf * (0.5 + Math.random()*0.5));
-    amt = Math.round(amt / 50) * 50; amt = Math.max(minA, Math.min(maxA, amt));
-    const bet = { id: 'b' + Date.now() + '_' + i, client, pt: chosen.pt, opt: chosen.opt, amt, odds: Math.round(chosen.odds * 100) / 100, settled: false };
-    if (chosen.hc !== undefined) bet.hc = String(chosen.hc);
-    gen.push(bet);
+  // 计算需要多少客户
+  const avgPer = Math.floor((perMin + perMax) / 2);
+  let numClients = Math.ceil(n / avgPer);
+  numClients = Math.min(numClients, CLIENTS.length);
+  numClients = Math.max(numClients, 1);
+
+  // 随机选取客户
+  const pool = [...CLIENTS].sort(() => Math.random() - 0.5);
+  const selected = pool.slice(0, numClients);
+
+  // 分配每人注数（每人 perMin~perMax 注，总和尽量接近 n）
+  const betsPerClient = {};
+  let remaining = n;
+  for (let i = 0; i < selected.length; i++) {
+    const left = selected.length - i;
+    if (left === 1) {
+      betsPerClient[selected[i]] = Math.max(perMin, Math.min(perMax, remaining));
+    } else {
+      const lo = Math.max(perMin, remaining - (left - 1) * perMax);
+      const hi = Math.min(perMax, remaining - (left - 1) * perMin);
+      betsPerClient[selected[i]] = lo + Math.floor(Math.random() * (hi - lo + 1));
+    }
+    remaining -= betsPerClient[selected[i]];
+  }
+
+  // 生成注单
+  const used = new Set(); const gen = []; let betIdx = 0;
+  for (const client of selected) {
+    used.add(client);
+    for (let j = 0; j < betsPerClient[client]; j++) {
+      // 加权随机选取赔率
+      const r = Math.random() * totalW; let acc = 0, chosen = all[0];
+      for (const o of all) { acc += o.weight; if (r <= acc) { chosen = o; break; } }
+
+      // 金额：波胆特殊处理
+      const rf = Math.min(1, 1 / Math.max(0.3, chosen.odds - 0.5));
+      let amt;
+      if (chosen.pt === 'cs') {
+        const csMax = Math.min(2000, maxA);
+        amt = minA + Math.floor((csMax - minA) * rf * (0.5 + Math.random() * 0.5));
+        amt = Math.round(amt / 100) * 100;
+        amt = Math.max(minA, Math.min(csMax, amt));
+      } else {
+        amt = minA + Math.floor((maxA - minA) * rf * (0.5 + Math.random() * 0.5));
+        amt = Math.round(amt / 50) * 50;
+        amt = Math.max(minA, Math.min(maxA, amt));
+      }
+
+      const bet = {
+        id: 'b' + Date.now() + '_' + betIdx,
+        client, pt: chosen.pt, opt: chosen.opt, amt,
+        odds: Math.round(chosen.odds * 100) / 100,
+        settled: false
+      };
+      if (chosen.hc !== undefined) bet.hc = String(chosen.hc);
+      gen.push(bet);
+      betIdx++;
+    }
   }
 
   m.bets.push(...gen); used.forEach(c => S.cl.add(c)); save();
   hideOCR(); renderList(); switchMatch(m.id);
 
-  const stat = {}; gen.forEach(b=>{const k=ptLabel(b.pt);stat[k]=(stat[k]||0)+1;});
-  alert('✅ 已生成 ' + gen.length + ' 笔下注\n👤 ' + used.size + ' 用户\n📊 ' + Object.entries(stat).map(([k,v])=>k+v+'注').join(' | '));
+  const stat = {};
+  gen.forEach(b => { const k = ptLabel(b.pt); stat[k] = (stat[k] || 0) + 1; });
+  alert('✅ 已生成 ' + gen.length + ' 笔下注\n👤 ' + used.size + ' 个客户（每客户' + perMin + '-' + perMax + '注）\n📊 ' + Object.entries(stat).map(([k, v]) => k + v + '注').join(' | '));
 }
 
 // 辅助函数
@@ -593,7 +661,7 @@ function ptLabel(pt) { return pt==='cs'?'波胆':pt==='1x2'?'独赢':pt==='ah'?'
 
 // 监听参数变化
 document.addEventListener('DOMContentLoaded', ()=>{
-  setTimeout(()=>{['ocrBetCount','ocrBetMin','ocrBetMax'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',updateBetPreview);});},1000);
+  setTimeout(()=>{['ocrBetCount','ocrBetMin','ocrBetMax','ocrPerMin','ocrPerMax'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',updateBetPreview);});},1000);
 });
 
 // ===== 数据 =====
