@@ -9,6 +9,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.0",
-    "railway": "^3.3.2"
+    "railway": "^3.3.2",
+    "tesseract.js": "^5.1.1"
   }
 }

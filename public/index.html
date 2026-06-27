@@ -134,6 +134,7 @@ tr:hover{background:#1e293b}
     <div style="padding:10px;border-top:1px solid #334155">
       <button class="btn btn-a" style="width:100%;margin-bottom:6px" onclick="manualSync()">手动同步</button>
       <button class="btn btn-a admin-only-btn" style="width:100%;margin-bottom:6px" onclick="exp()">导出</button>
+      <button class="btn btn-a admin-only-btn" style="width:100%;margin-bottom:6px" onclick="showOCR()">📷 截图识别</button>
       <button class="btn btn-a admin-only-btn" style="width:100%" onclick="imp()">导入</button>
     </div>
   </div>
@@ -175,6 +176,72 @@ tr:hover{background:#1e293b}
     <div style="display:flex;gap:8px">
       <button class="btn btn-a" onclick="doAdd()">确认</button>
       <button class="btn" style="background:#ef4444;color:#fff" onclick="hideAdd()">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- OCR 截图识别弹窗 -->
+<div class="modal-o" id="ocrM" style="display:none">
+  <div class="modal" style="max-width:520px">
+    <h3 style="color:#38bdf8;margin-bottom:4px">📷 截图识别赔率</h3>
+    <p style="font-size:12px;color:#94a3b8;margin-bottom:14px">上传赔率截图，自动识别球队和赔率</p>
+    <!-- 上传区 -->
+    <div id="ocrUpload" style="border:2px dashed #475569;border-radius:12px;padding:30px;text-align:center;cursor:pointer;margin-bottom:12px;transition:border-color .2s"
+         onclick="document.getElementById('ocrFile').click()"
+         ondragover="this.style.borderColor='#38bdf8';event.preventDefault()"
+         ondragleave="this.style.borderColor='#475569'"
+         ondrop="handleOCRDrop(event)">
+      <p style="font-size:40px;margin:0 0 8px">📸</p>
+      <p style="color:#94a3b8;font-size:13px;margin:0">点击选择截图 或 拖拽到此处</p>
+      <input type="file" id="ocrFile" accept="image/*" style="display:none" onchange="handleOCRFile(event)">
+    </div>
+    <!-- 预览 -->
+    <div id="ocrPreview" style="display:none;margin-bottom:12px;position:relative">
+      <img id="ocrImg" style="width:100%;border-radius:8px;max-height:300px;object-fit:contain">
+      <button onclick="resetOCR()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;line-height:26px">✕</button>
+    </div>
+    <!-- 进度 -->
+    <div id="ocrProgress" style="display:none;margin-bottom:12px">
+      <div style="background:#334155;border-radius:8px;height:6px;overflow:hidden">
+        <div id="ocrBar" style="height:100%;background:linear-gradient(90deg,#38bdf8,#818cf8);width:0%;transition:width .3s"></div>
+      </div>
+      <p id="ocrStatus" style="color:#94a3b8;font-size:12px;margin:6px 0 0;text-align:center">准备识别...</p>
+    </div>
+    <!-- 结果区 -->
+    <div id="ocrResult" style="display:none;background:#1e293b;border-radius:8px;padding:14px;margin-bottom:12px">
+      <div style="margin-bottom:10px"><label style="font-size:12px;color:#94a3b8">主队</label><input id="ocrHome" style="width:100%;margin-top:3px"></div>
+      <div style="margin-bottom:10px"><label style="font-size:12px;color:#94a3b8">客队</label><input id="ocrAway" style="width:100%;margin-top:3px"></div>
+      <div style="margin-bottom:10px"><label style="font-size:12px;color:#94a3b8">比赛时间</label><input id="ocrTime" type="datetime-local" style="width:100%;margin-top:3px"></div>
+      <div style="margin-bottom:8px"><label style="font-size:12px;color:#94a3b8">欧赔 1X2 (主胜/平/客胜)</label>
+        <div style="display:flex;gap:6px;margin-top:3px">
+          <input id="ocr1x2h" placeholder="主胜" style="flex:1">
+          <input id="ocr1x2d" placeholder="平" style="flex:1">
+          <input id="ocr1x2a" placeholder="客胜" style="flex:1">
+        </div>
+      </div>
+      <div style="margin-bottom:8px"><label style="font-size:12px;color:#94a3b8">亚盘</label>
+        <div style="display:flex;gap:6px;margin-top:3px">
+          <input id="ocrAhL" placeholder="盘口" style="flex:1">
+          <input id="ocrAhH" placeholder="主水" style="flex:1">
+          <input id="ocrAhA" placeholder="客水" style="flex:1">
+        </div>
+      </div>
+      <div style="margin-bottom:4px"><label style="font-size:12px;color:#94a3b8">大小球</label>
+        <div style="display:flex;gap:6px;margin-top:3px">
+          <input id="ocrOuL" placeholder="盘口" style="flex:1">
+          <input id="ocrOuO" placeholder="大球" style="flex:1">
+          <input id="ocrOuU" placeholder="小球" style="flex:1">
+        </div>
+      </div>
+    </div>
+    <!-- 操作按钮 -->
+    <div id="ocrBtns" style="display:none">
+      <button class="btn btn-a" style="width:100%;margin-bottom:6px" onclick="doOCRSave()">✅ 创建比赛并随机生成注单</button>
+      <button class="btn" style="width:100%;background:#ef4444;color:#fff" onclick="hideOCR()">取消</button>
+    </div>
+    <div id="ocrStartBtn">
+      <button class="btn btn-a" style="width:100%" onclick="startOCR()" id="ocrRunBtn" disabled>🔍 开始识别</button>
+      <button class="btn" style="width:100%;margin-top:6px" onclick="hideOCR()">取消</button>
     </div>
   </div>
 </div>
@@ -265,6 +332,216 @@ async function verifyStoredAuth() {
   } catch(e) {
     return false; // 离线模式：使用本地存储的令牌
   }
+}
+
+// ===== 截图识别 OCR =====
+let _ocrImageData = null;
+
+function showOCR() {
+  document.getElementById('ocrM').style.display = 'flex';
+  resetOCR();
+}
+
+function hideOCR() {
+  document.getElementById('ocrM').style.display = 'none';
+}
+
+function resetOCR() {
+  _ocrImageData = null;
+  document.getElementById('ocrUpload').style.display = '';
+  document.getElementById('ocrPreview').style.display = 'none';
+  document.getElementById('ocrProgress').style.display = 'none';
+  document.getElementById('ocrResult').style.display = 'none';
+  document.getElementById('ocrBtns').style.display = 'none';
+  document.getElementById('ocrStartBtn').style.display = '';
+  document.getElementById('ocrRunBtn').disabled = true;
+  document.getElementById('ocrBar').style.width = '0%';
+  document.getElementById('ocrStatus').textContent = '';
+  document.getElementById('ocrFile').value = '';
+}
+
+function handleOCRFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    _ocrImageData = ev.target.result;
+    showOCRPreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleOCRDrop(e) {
+  e.preventDefault();
+  e.target.style.borderColor = '#475569';
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    _ocrImageData = ev.target.result;
+    showOCRPreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function showOCRPreview() {
+  document.getElementById('ocrUpload').style.display = 'none';
+  document.getElementById('ocrPreview').style.display = '';
+  document.getElementById('ocrImg').src = _ocrImageData;
+  document.getElementById('ocrRunBtn').disabled = false;
+}
+
+async function startOCR() {
+  if (!_ocrImageData) return;
+  document.getElementById('ocrProgress').style.display = '';
+  document.getElementById('ocrStartBtn').style.display = 'none';
+  document.getElementById('ocrBar').style.width = '5%';
+  document.getElementById('ocrStatus').textContent = '正在上传图片...';
+
+  try {
+    document.getElementById('ocrBar').style.width = '15%';
+    document.getElementById('ocrStatus').textContent = '正在识别文字（可能需要10-30秒）...';
+
+    const token = getAuthToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['x-auth-token'] = token;
+
+    const resp = await fetch(API_BASE + '/api/ocr', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ image: _ocrImageData })
+    });
+
+    document.getElementById('ocrBar').style.width = '90%';
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error || '识别失败');
+    }
+
+    const data = await resp.json();
+    document.getElementById('ocrBar').style.width = '100%';
+    document.getElementById('ocrStatus').textContent = '识别完成！';
+
+    // 填充结果
+    const p = data.parsed;
+    document.getElementById('ocrHome').value = p.homeTeam || '';
+    document.getElementById('ocrAway').value = p.awayTeam || '';
+
+    // 处理时间
+    if (p.time) {
+      const now = new Date();
+      const t = p.time.match(/(\d{1,2})[-\/](\d{1,2})\s+(\d{1,2}):(\d{2})/);
+      if (t) {
+        const mo = parseInt(t[1]), d = parseInt(t[2]), h = parseInt(t[3]), m = parseInt(t[4]);
+        const yr = now.getFullYear();
+        const dt = new Date(yr, mo-1, d, h, m);
+        document.getElementById('ocrTime').value = dt.toISOString().slice(0,16);
+      }
+    }
+
+    if (p.odds['1x2']) {
+      document.getElementById('ocr1x2h').value = p.odds['1x2'].home;
+      document.getElementById('ocr1x2d').value = p.odds['1x2'].draw;
+      document.getElementById('ocr1x2a').value = p.odds['1x2'].away;
+    }
+    if (p.odds.ah) {
+      document.getElementById('ocrAhL').value = p.odds.ah.line;
+      document.getElementById('ocrAhH').value = p.odds.ah.home;
+      document.getElementById('ocrAhA').value = p.odds.ah.away;
+    }
+    if (p.odds.ou) {
+      document.getElementById('ocrOuL').value = p.odds.ou.line;
+      document.getElementById('ocrOuO').value = p.odds.ou.over;
+      document.getElementById('ocrOuU').value = p.odds.ou.under;
+    }
+
+    // 显示结果和按钮
+    document.getElementById('ocrProgress').style.display = 'none';
+    document.getElementById('ocrResult').style.display = '';
+    document.getElementById('ocrBtns').style.display = '';
+
+  } catch(e) {
+    document.getElementById('ocrStatus').textContent = '❌ ' + e.message;
+    document.getElementById('ocrBar').style.background = '#ef4444';
+    document.getElementById('ocrStartBtn').style.display = '';
+    document.getElementById('ocrRunBtn').disabled = false;
+  }
+}
+
+async function doOCRSave() {
+  const home = document.getElementById('ocrHome').value.trim();
+  const away = document.getElementById('ocrAway').value.trim();
+  const time = document.getElementById('ocrTime').value;
+
+  if (!home || !away) return alert('请输入主队和客队名称');
+
+  // 确定启用的玩法
+  const pts = [];
+  if (document.getElementById('ocr1x2h').value) pts.push('1x2');
+  if (document.getElementById('ocrAhL').value) pts.push('ah');
+  if (document.getElementById('ocrOuL').value) pts.push('ou');
+
+  // 创建比赛
+  const match = {
+    id: 'm' + Date.now(),
+    h: home, a: away, time: time,
+    pts: pts.length ? pts : ['1x2', 'ah', 'ou'],
+    bets: [], res: null
+  };
+
+  // 随机生成下注记录
+  const clients = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  const numBets = 5 + Math.floor(Math.random() * 16); // 5-20 条
+  const usedClients = new Set();
+
+  for (let i = 0; i < numBets; i++) {
+    const pt = match.pts[Math.floor(Math.random() * match.pts.length)];
+    const client = clients[Math.floor(Math.random() * clients.length)];
+    usedClients.add(client);
+
+    let opt = '', odds = 1.8;
+    if (pt === '1x2') {
+      const opts = ['主胜', '平局', '客胜'];
+      opt = opts[Math.floor(Math.random() * 3)];
+      const oVals = [
+        document.getElementById('ocr1x2h').value,
+        document.getElementById('ocr1x2d').value,
+        document.getElementById('ocr1x2a').value
+      ];
+      odds = parseFloat(oVals[opts.indexOf(opt)]) || (1.5 + Math.random() * 3);
+    } else if (pt === 'ah') {
+      opt = Math.random() > 0.5 ? '主队' : '客队';
+      const lineVal = parseFloat(document.getElementById('ocrAhL').value) || 0;
+      odds = Math.random() > 0.5 ? (0.85 + Math.random() * 0.2) : (0.85 + Math.random() * 0.2);
+    } else if (pt === 'ou') {
+      opt = Math.random() > 0.5 ? '大球' : '小球';
+      odds = 0.85 + Math.random() * 0.2;
+    }
+
+    match.bets.push({
+      id: 'b' + Date.now() + '_' + i,
+      client: client,
+      pt: pt,
+      opt: opt,
+      amt: Math.floor((100 + Math.random() * 900) / 100) * 100, // 100-1000 的整百
+      odds: Math.round(odds * 100) / 100,
+      settled: false
+    });
+  }
+
+  // 添加到数据
+  S.ms.push(match);
+  S.cid = match.id;
+  usedClients.forEach(c => S.cl.add(c));
+  save();
+
+  // 关闭弹窗并刷新
+  hideOCR();
+  renderList();
+  switchMatch(match.id);
+
+  alert(`✅ 比赛 "${home} vs ${away}" 已创建\n📝 随机生成 ${numBets} 笔下注记录\n👤 ${usedClients.size} 个用户参与`);
 }
 
 // ===== 数据 =====

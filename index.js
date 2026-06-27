@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
+const Tesseract = require('tesseract.js');
 
 const crypto = require('crypto');
 
@@ -430,6 +431,142 @@ app.post('/api/restore', (req, res) => {
     res.status(500).json({ error: '恢复失败: ' + e.message });
   }
 });
+
+// ===== 截图 OCR 识别赔率 =====
+app.post('/api/ocr', (req, res) => {
+  try {
+    const { image } = req.body || {};
+    if (!image) {
+      return res.status(400).json({ error: '请提供图片数据' });
+    }
+
+    // 去掉 data:image/xxx;base64, 前缀
+    const base64 = image.replace(/^data:image\/\w+;base64,/, '');
+    const buf = Buffer.from(base64, 'base64');
+
+    // 使用 tesseract 识别中英文
+    Tesseract.recognize(buf, 'chi_sim+eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          console.log(`OCR 进度: ${Math.round(m.progress * 100)}%`);
+        }
+      }
+    }).then(({ data: { text } }) => {
+      console.log('OCR 原始结果:\n' + text);
+
+      // 解析识别文本，提取赔率数据
+      const parsed = parseOddsText(text);
+      res.json({ ok: true, raw: text, parsed });
+    }).catch(e => {
+      console.error('OCR 错误:', e.message);
+      res.status(500).json({ error: '图片识别失败: ' + e.message });
+    });
+  } catch (e) {
+    console.error('OCR 请求错误:', e.message);
+    res.status(500).json({ error: '处理失败: ' + e.message });
+  }
+});
+
+// ===== 赔率文本解析 =====
+function parseOddsText(text) {
+  const result = {
+    homeTeam: '',
+    awayTeam: '',
+    time: '',
+    odds: {}  // { '1x2': {home, draw, away}, 'ah': {line, home, away}, 'ou': {line, over, under} }
+  };
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // 尝试识别球队名称（通常在开头几行）
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const line = lines[i];
+    // 匹配 "队名1 vs 队名2" 或 "队名1 V 队名2" 或 "队名1 队名2" 含比分
+    const vsMatch = line.match(/(.+?)\s*[vV][sS]\s*(.+)/);
+    if (vsMatch) {
+      result.homeTeam = vsMatch[1].trim();
+      result.awayTeam = vsMatch[2].trim().replace(/\d+$/, '').trim(); // 去掉末尾分数
+      break;
+    }
+    // 匹配 "队名1 v 队名2"
+    const vMatch = line.match(/(.+?)\s+[vV]\s+(.+)/);
+    if (vMatch && !result.homeTeam) {
+      result.homeTeam = vMatch[1].trim();
+      result.awayTeam = vMatch[2].trim().split(/\d/)[0].trim();
+    }
+  }
+
+  // 如果没找到 vs 格式，尝试用前两行中较长的行
+  if (!result.homeTeam && lines.length >= 2) {
+    const candidates = lines.slice(0, 4).filter(l => l.length > 3 && !/^\d/.test(l) && !/赔率|盘口|odds/i.test(l));
+    if (candidates.length >= 2) {
+      result.homeTeam = candidates[0];
+      result.awayTeam = candidates[1].split(/\d/)[0].trim();
+    }
+  }
+
+  // 识别时间（格式: MM-DD HH:mm 或 YYYY-MM-DD HH:mm）
+  for (const line of lines) {
+    const timeMatch = line.match(/(\d{1,2}[-\/]\d{1,2}\s+\d{1,2}:\d{2})/);
+    if (timeMatch) {
+      result.time = timeMatch[1];
+      break;
+    }
+  }
+
+  // 识别欧赔 1x2 (主胜/平/客胜)
+  for (const line of lines) {
+    // 格式: 1.80 3.50 4.20 或 1.80 / 3.50 / 4.20
+    const oddsMatch = line.match(/(\d+\.\d{2})\s*[\/\s]\s*(\d+\.\d{2})\s*[\/\s]\s*(\d+\.\d{2})/);
+    if (oddsMatch) {
+      const h = parseFloat(oddsMatch[1]);
+      const d = parseFloat(oddsMatch[2]);
+      const a = parseFloat(oddsMatch[3]);
+      // 验证合理性: 通常在 1.01 ~ 999 之间
+      if (h > 1 && h < 100 && d > 1 && d < 100 && a > 1 && a < 100) {
+        result.odds['1x2'] = { home: h, draw: d, away: a };
+        break;
+      }
+    }
+  }
+
+  // 识别亚盘 handicap
+  for (const line of lines) {
+    // 格式: -0.5 0.90 0.95 或 0.5 1.05 0.85
+    const ahMatch = line.match(/([-+]?\d+\.?\d*)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
+    if (ahMatch) {
+      const line_val = parseFloat(ahMatch[1]);
+      const home_odds = parseFloat(ahMatch[2]);
+      const away_odds = parseFloat(ahMatch[3]);
+      if (Math.abs(line_val) <= 5 && home_odds > 0.5 && away_odds > 0.5) {
+        result.odds.ah = { line: line_val, home: home_odds, away: away_odds };
+        break;
+      }
+    }
+  }
+
+  // 识别大小球
+  for (const line of lines) {
+    const ouMatch = line.match(/(\d+\.?\d*)\s+[大小]\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
+    if (ouMatch) {
+      result.odds.ou = { line: parseFloat(ouMatch[1]), over: parseFloat(ouMatch[2]), under: parseFloat(ouMatch[3]) };
+      break;
+    }
+  }
+  // 英文大小球: O/U 2.5 0.90 0.95
+  if (!result.odds.ou) {
+    for (const line of lines) {
+      const ouMatch2 = line.match(/[Oo]\s*[\/]\s*[Uu]\s*(\d+\.?\d*)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
+      if (ouMatch2) {
+        result.odds.ou = { line: parseFloat(ouMatch2[1]), over: parseFloat(ouMatch2[2]), under: parseFloat(ouMatch2[3]) };
+        break;
+      }
+    }
+  }
+
+  console.log('解析结果:', JSON.stringify(result, null, 2));
+  return result;
+}
 
 // 前端路由回退（SPA 支持）
 app.get('*', (req, res) => {
