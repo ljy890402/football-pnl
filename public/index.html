@@ -233,6 +233,11 @@ tr:hover{background:#1e293b}
           <input id="ocrOuU" placeholder="小球" style="flex:1">
         </div>
       </div>
+      <div style="margin-bottom:4px"><label style="font-size:12px;color:#94a3b8">波胆赔率（比分 / 赔率）</label>
+        <div id="ocrCsArea" style="margin-top:3px;max-height:180px;overflow-y:auto">
+          <p style="color:#64748b;font-size:12px">未识别到波胆数据</p>
+        </div>
+      </div>
     </div>
     <!-- 操作按钮 -->
     <div id="ocrBtns" style="display:none">
@@ -358,6 +363,7 @@ function resetOCR() {
   document.getElementById('ocrBar').style.width = '0%';
   document.getElementById('ocrStatus').textContent = '';
   document.getElementById('ocrFile').value = '';
+  document.getElementById('ocrCsArea').innerHTML = '<p style="color:#64748b;font-size:12px">未识别到波胆数据</p>';
 }
 
 function handleOCRFile(e) {
@@ -456,6 +462,23 @@ async function startOCR() {
       document.getElementById('ocrOuU').value = p.odds.ou.under;
     }
 
+    if (p.odds.cs && p.odds.cs.length) {
+      let csHtml = '<table style="width:100%;font-size:12px;border-collapse:collapse">';
+      // 按赔率升序排列
+      const csList = p.odds.cs.sort((a,b) => a.odds - b.odds);
+      // 每行2列
+      for (let i = 0; i < csList.length; i += 2) {
+        csHtml += '<tr>';
+        csHtml += '<td style="padding:3px 6px"><span style="color:#38bdf8;font-weight:700">'+csList[i].score+'</span> <span style="color:#fbbf24">'+csList[i].odds.toFixed(2)+'</span></td>';
+        if (i+1 < csList.length) {
+          csHtml += '<td style="padding:3px 6px"><span style="color:#38bdf8;font-weight:700">'+csList[i+1].score+'</span> <span style="color:#fbbf24">'+csList[i+1].odds.toFixed(2)+'</span></td>';
+        }
+        csHtml += '</tr>';
+      }
+      csHtml += '</table>';
+      document.getElementById('ocrCsArea').innerHTML = csHtml;
+    }
+
     // 显示结果和按钮
     document.getElementById('ocrProgress').style.display = 'none';
     document.getElementById('ocrResult').style.display = '';
@@ -481,6 +504,10 @@ async function doOCRSave() {
   if (document.getElementById('ocr1x2h').value) pts.push('1x2');
   if (document.getElementById('ocrAhL').value) pts.push('ah');
   if (document.getElementById('ocrOuL').value) pts.push('ou');
+  // 检查波胆数据
+  const csArea = document.getElementById('ocrCsArea');
+  const hasCs = !csArea.querySelector('p') && csArea.textContent.trim() !== '未识别到波胆数据';
+  if (hasCs) pts.push('cs');
 
   // 创建比赛
   const match = {
@@ -512,11 +539,24 @@ async function doOCRSave() {
       odds = parseFloat(oVals[opts.indexOf(opt)]) || (1.5 + Math.random() * 3);
     } else if (pt === 'ah') {
       opt = Math.random() > 0.5 ? '主队' : '客队';
-      const lineVal = parseFloat(document.getElementById('ocrAhL').value) || 0;
       odds = Math.random() > 0.5 ? (0.85 + Math.random() * 0.2) : (0.85 + Math.random() * 0.2);
     } else if (pt === 'ou') {
       opt = Math.random() > 0.5 ? '大球' : '小球';
       odds = 0.85 + Math.random() * 0.2;
+    } else if (pt === 'cs') {
+      // 从 OCR 识别结果中随机选一个比分
+      const csEls = document.querySelectorAll('#ocrCsArea td span:first-child');
+      if (csEls.length > 0) {
+        const idx = Math.floor(Math.random() * csEls.length);
+        opt = csEls[idx].textContent.trim();
+        const oddsEl = csEls[idx].nextElementSibling;
+        odds = oddsEl ? parseFloat(oddsEl.textContent) : (5 + Math.random() * 10);
+      } else {
+        // 随机生成常见比分
+        const scores = ['1-0','0-1','1-1','2-0','0-2','2-1','1-2','2-2','3-0','0-3','3-1','1-3','其他'];
+        opt = scores[Math.floor(Math.random() * scores.length)];
+        odds = 5 + Math.random() * 15;
+      }
     }
 
     match.bets.push({

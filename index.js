@@ -473,7 +473,7 @@ function parseOddsText(text) {
     homeTeam: '',
     awayTeam: '',
     time: '',
-    odds: {}  // { '1x2': {home, draw, away}, 'ah': {line, home, away}, 'ou': {line, over, under} }
+    odds: {}  // { '1x2': {home, draw, away}, 'ah': {line, home, away}, 'ou': {line, over, under}, 'cs': [{score, odds}, ...] }
   };
 
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
@@ -562,6 +562,37 @@ function parseOddsText(text) {
         break;
       }
     }
+  }
+
+  // 识别波胆/正确比分赔率 (格式: 1-0 8.00, 2-1 9.50, 其他 15.00)
+  const csList = [];
+  for (const line of lines) {
+    // 匹配: "1-0 8.00", "2-1 9.50", "0-0 12.00" 等
+    const csMatch = line.match(/(\d+\s*[-:]\s*\d+)\s+(\d+\.?\d{0,2})/);
+    if (csMatch) {
+      const score = csMatch[1].replace(/\s+/g, '');
+      const oddsVal = parseFloat(csMatch[2]);
+      if (oddsVal > 1 && oddsVal < 999) {
+        csList.push({ score, odds: oddsVal });
+      }
+    }
+    // 匹配 "其他 15.00"
+    const otherMatch = line.match(/其他\s+(\d+\.?\d{0,2})/);
+    if (otherMatch) {
+      const oddsVal = parseFloat(otherMatch[1]);
+      if (oddsVal > 1 && oddsVal < 999) {
+        csList.push({ score: '其他', odds: oddsVal });
+      }
+    }
+  }
+  if (csList.length >= 3) {
+    // 去重（按 score）
+    const seen = new Set();
+    result.odds.cs = csList.filter(x => {
+      if (seen.has(x.score)) return false;
+      seen.add(x.score);
+      return true;
+    });
   }
 
   console.log('解析结果:', JSON.stringify(result, null, 2));
