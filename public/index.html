@@ -351,7 +351,7 @@ function renderList() {
       }
     }
     return '<div class="mi'+act+'" onclick="switchMatch(\''+m.id+'\')">' +
-      '<button class="del" onclick="event.stopPropagation();delMatch(\''+m.id+'\')">✕</button>' +
+      '<button class="del admin-only-btn" onclick="event.stopPropagation();delMatch(\''+m.id+'\')">✕</button>' +
       '<div class="t">'+m.h+' vs '+m.a+'</div>' +
       '<div class="i">'+(m.time?m.time.replace('T',' '):'时间未设')+' | '+resStr+'</div>' +
       '<div class="c">注单：'+m.bets.length+'笔</div>' +
@@ -375,6 +375,7 @@ function switchMatch(id) {
 }
 
 function delMatch(id) {
+  if (_auth && _auth.role !== 'admin') return alert('当前账户为只读模式，无法删除');
   if (!confirm('删除本场比赛及所有注单？')) return;
   S.ms = S.ms.filter(m => m.id !== id);
   if (S.cid === id) S.cid = S.ms.length ? S.ms[0].id : null;
@@ -571,7 +572,7 @@ function renderBetTable(bets, m) {
     }
     return '<tr><td>'+b.client+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td>'+hc+'</td><td>'+b.amt+'</td><td>'+b.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
       '<td>'+settleStr+'</td>' +
-      '<td><button class="btn" style="background:#ef4444;color:#fff;font-size:11px;padding:3px 8px" onclick="delBet(\''+m.id+'\',\''+b.id+'\')">删除</button>' +
+      '<td><button class="btn admin-only-btn" style="background:#ef4444;color:#fff;font-size:11px;padding:3px 8px" onclick="delBet(\''+m.id+'\',\''+b.id+'\')">删除</button>' +
       (b.settled ? '<button class="btn" style="background:#94a3b8;color:#fff;font-size:11px;padding:3px 8px;margin-left:4px" onclick="undoSettle(\''+m.id+'\',\''+b.id+'\')">撤销</button>' : '') +
       '</td></tr>';
   }).join('');
@@ -580,6 +581,7 @@ function renderBetTable(bets, m) {
 }
 
 function delBet(mid, bid) {
+  if (_auth && _auth.role !== 'admin') return alert('当前账户为只读模式，无法删除');
   const m = S.ms.find(x => x.id === mid); if (!m) return;
   m.bets = m.bets.filter(b => b.id !== bid);
   save(); renderList(); switchTab('bets');
