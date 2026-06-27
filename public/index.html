@@ -264,7 +264,7 @@ tr:hover{background:#1e293b}
       <div style="background:#1e293b;border-radius:6px;height:6px;overflow:hidden"><div id="oddsOcrBar" style="height:100%;width:0%;background:linear-gradient(90deg,#8b5cf6,#38bdf8);transition:width 0.3s"></div></div>
       <p id="oddsOcrStatus" style="font-size:11px;color:#94a3b8;margin-top:4px"></p>
     </div>
-    <div id="oddsOcrResult" style="display:none;max-height:350px;overflow-y:auto;margin-bottom:10px"></div>
+    <div id="oddsOcrResult" style="display:none;max-height:500px;overflow-y:auto;margin-bottom:10px"></div>
     <div style="display:flex;gap:6px">
       <button id="oddsOcrRunBtn" class="btn btn-a" style="flex:1" onclick="startOddsOCR()" disabled>🔍 开始识别</button>
       <button class="btn" style="background:#ef4444;color:#fff;flex:1" onclick="hideOddsOCR()">取消</button>
@@ -483,15 +483,36 @@ async function startOCR() {
 
 // ===== 解析全部赔率 =====
 function parseAllOdds(text) {
-  // 预处理：统一分隔符，合并断行
+  // 预处理：统一分隔符
   const raw = text.replace(/\t/g, '  ').replace(/\r/g, '\n');
-  let lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   const result = { '1x2': [], ah: [], ou: [], cs: [] };
+  console.log('=== OCR原始文本 ===\n' + raw + '\n=== END ===');
 
-  // ==== 波胆预处理：矩阵布局下比分/赔率常被 OCR 拆成两行 ====
-  // 例： 1-0 (行1) + 51 (行2) → 合并为 "1-0 51"
-  const scoreRe = /^\s*(\d+)\s*[-:]\s*(\d+)\s*$/;   // 纯比分行: "1-0", "2:1"
-  const oddsOnlyRe = /^\s*(\d+(?:\.\d{1,2})?)\s*$/;  // 纯赔率行: "51", "9.8", "6.0"
+  // ==== 阶段0: 全局匹配所有比分-赔率对（支持同一行多个对）====
+  // 波胆赔率通常 > 2.0，用这个阈值区分让球/大小球（水位通常 ≤ 2.0）
+  const csGlobalRe = /(\d+[-:]\d+)\s+(\d+(?:\.\d{1,2})?)/g;
+  let gMatch;
+  while ((gMatch = csGlobalRe.exec(raw)) !== null) {
+    const score = gMatch[1].replace(/\s+/g, '');
+    const ov = parseFloat(gMatch[2]);
+    if (ov > 2.0 && ov < 999) {
+      result.cs.push({ score, odds: ov });
+    }
+  }
+
+  // "其他"（波胆）
+  const otherMatch = raw.match(/其他\s*(?:一切)?\s*(\d+(?:\.\d{1,2})?)/g);
+  if (otherMatch) {
+    otherMatch.forEach(m => {
+      const om = m.match(/(\d+(?:\.\d{1,2})?)/);
+      if (om && parseFloat(om[1]) > 2) result.cs.push({ score: '其他', odds: parseFloat(om[1]) });
+    });
+  }
+
+  // ==== 阶段1: 合并拆行的比分-赔率（矩阵布局）====
+  let lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const scoreRe = /^\s*(\d+)\s*[-:]\s*(\d+)\s*$/;
+  const oddsOnlyRe = /^\s*(\d+(?:\.\d{1,2})?)\s*$/;
   const merged = [];
   for (let i = 0; i < lines.length; i++) {
     const sc = lines[i].match(scoreRe);
@@ -499,11 +520,9 @@ function parseAllOdds(text) {
       const nextOdds = lines[i + 1].match(oddsOnlyRe);
       if (nextOdds) {
         const ov = parseFloat(nextOdds[1]);
-        if (ov > 1 && ov < 999) {
-          // 合并为一行
+        if (ov > 2.0 && ov < 999) {
           merged.push(sc[1] + '-' + sc[2] + ' ' + nextOdds[1]);
-          i++; // 跳过赔率行
-          continue;
+          i++; continue;
         }
       }
     }
@@ -511,36 +530,26 @@ function parseAllOdds(text) {
   }
   lines = merged;
 
-  // 灵活的赔率数字：1-2位小数（容忍OCR漏小数点的情况）
+  // ==== 阶段2: 逐行解析 AH/OU/1X2 ====
   const ODDS = '(\\d+(?:\\.\\d{1,2})?)';
-  const LINE_NO = '([-+]?\\d+(?:\\.\\d)?)'; // 盘口如 -0.5, +1, 2.5
+  const LINE_NO = '([-+]?\\d+(?:\\.\\d)?)';
 
   for (const line of lines) {
-    // 跳过明显不是赔率的行
     if (/^[A-Za-z\s]{4,}$/.test(line) && !/\d/.test(line)) continue;
     if (/^(时间|日期|比赛|联赛|Time|Date|Match)/i.test(line)) continue;
 
-    // ---- 波胆优先 ----
-    // 同行格式: "1-0 51", "2-1 9.8"
-    const csM = line.match(/(\d+\s*[-:]\s*\d+)\s+(\d+(?:\.\d{1,2})?)/);
-    if (csM) {
-      const score = csM[1].replace(/\s+/g, '');
-      const ov = parseFloat(csM[2]);
-      if (ov > 1 && ov < 999) { result.cs.push({ score, odds: ov }); continue; }
-    }
-
-    // 矩阵多列格式: "1-0 51 15 13" → 取第一个赔率
-    const csMulti = line.match(/(\d+[-:]\d+)\s+(\d+(?:\.\d{1,2})?)(?:\s+\d+(?:\.\d{1,2})?)+/);
-    if (csMulti) {
-      const score = csMulti[1].replace(/\s+/g, '');
-      const ov = parseFloat(csMulti[2]);
-      if (ov > 1 && ov < 999) { result.cs.push({ score, odds: ov }); continue; }
-    }
-
-    // "其他"（波胆）
-    if (/其他/.test(line)) {
-      const om = line.match(/其他\s*(?:一切)?\s*(\d+(?:\.\d{1,2})?)/);
-      if (om && parseFloat(om[1]) > 1) { result.cs.push({ score: '其他', odds: parseFloat(om[1]) }); continue; }
+    // 行内波胆（阶段0的补充：捕获赔率 ≤ 2.0 的波胆，比如罕见的低赔率比分）
+    const csInline = line.match(/(\d+\s*[-:]\s*\d+)\s+(\d+(?:\.\d{1,2})?)/);
+    if (csInline) {
+      const score = csInline[1].replace(/\s+/g, '');
+      const ov = parseFloat(csInline[2]);
+      // 只补充阶段0漏掉的（阶段0已用 > 2.0 过滤）
+      if (ov > 2.0 && ov < 999) {
+        // 已在阶段0中处理，跳过
+      } else if (ov > 1.0 && ov < 2.0 && !/(?:[OoUu大小]|[-+]\d)/i.test(line)) {
+        // 低赔率波胆，且不是AH/OU格式
+        result.cs.push({ score, odds: ov });
+      }
     }
 
     // ---- 尝试匹配盘口+2个水位 ----
@@ -599,6 +608,7 @@ function dedup1X2(arr) { const s=new Set(); return arr.filter(x=>{const k=x.home
 function dedupAH(arr) { const s=new Set(); return arr.filter(x=>{const k=String(x.line)+'|'+x.home.toFixed(2)+'|'+x.away.toFixed(2);if(s.has(k))return false;s.add(k);return true;}); }
 function dedupOU(arr) { const s=new Set(); return arr.filter(x=>{const k=String(x.line)+'|'+x.over.toFixed(2)+'|'+x.under.toFixed(2);if(s.has(k))return false;s.add(k);return true;}); }
 function dedupCs(arr) { const s=new Set(); return arr.filter(x=>{if(s.has(x.score))return false;s.add(x.score);return true;}); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ===== 赔率总览 =====
 function renderOddsOverview(odds) {
@@ -1312,10 +1322,12 @@ async function startOddsOCR() {
         _oddsOCRParsedOdds.ou.map(o=>'<span style="color:#a78bfa">'+o.line+'</span> <span style="color:#fbbf24">'+o.over.toFixed(2)+'/'+o.under.toFixed(2)+'</span>').join(', ')+'</div>';
     }
     if (_oddsOCRParsedOdds.cs.length) {
-      rh += '<div style="background:#0f172a;border-radius:6px;padding:8px;margin-bottom:6px"><span style="color:#38bdf8;font-size:12px">🎯 波胆:</span> '+
+      rh += '<div style="background:#0f172a;border-radius:6px;padding:8px;margin-bottom:6px"><span style="color:#38bdf8;font-size:12px">🎯 波胆 ('+_oddsOCRParsedOdds.cs.length+'项):</span> '+
         _oddsOCRParsedOdds.cs.map(o=>'<span style="color:#fbbf24">'+o.score+'('+o.odds+')</span>').join(' ')+'</div>';
     }
     if (!rh) rh = '<p style="color:#ef4444;font-size:12px">未识别到赔率数据</p>';
+    // 添加原始OCR文本（调试用，可折叠）
+    rh += '<details style="margin-top:10px;background:#0f172a;border-radius:6px;padding:8px"><summary style="color:#64748b;font-size:11px;cursor:pointer">🔍 原始OCR文本（调试）</summary><pre style="color:#94a3b8;font-size:10px;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;margin:8px 0 0">'+escHtml(text)+'</pre></details>';
     resultEl.innerHTML = rh;
     document.getElementById('oddsOcrResult').style.display = '';
     document.getElementById('oddsOcrProgress').style.display = 'none';
