@@ -76,15 +76,54 @@ tr:hover{background:#1e293b}
   .sg{grid-template-columns:1fr 1fr}
   .tab{padding:10px 10px;font-size:12px}
 }
+/* === 登录页 === */
+.login-wrap{position:fixed;top:0;left:0;width:100%;height:100%;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;padding:20px}
+.login-card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:40px 32px;max-width:400px;width:100%;text-align:center}
+.login-card h1{color:#38bdf8;font-size:24px;margin-bottom:4px}
+.login-card .sub{color:#94a3b8;font-size:13px;margin-bottom:24px}
+.login-card label{display:block;text-align:left;font-size:13px;color:#94a3b8;margin-bottom:4px;margin-top:12px}
+.login-card input{margin-bottom:4px}
+.login-card .err{color:#ef4444;font-size:12px;min-height:18px;margin-top:4px}
+.login-card .btn{width:100%;margin-top:8px;font-size:16px;padding:12px}
+.login-card .info{color:#64748b;font-size:11px;margin-top:16px;line-height:1.6}
+/* === 权限隐藏 === */
+.admin-only{display:none}.role-admin .admin-only{display:unset}
+.role-admin .admin-only-btn{display:inline-block}.role-finance .admin-only-btn{display:none}
+.role-admin .admin-only-flex{display:flex}.role-finance .admin-only-flex{display:none}
+/* === 用户信息条 === */
+.user-bar{padding:8px 16px;border-bottom:1px solid #334155;display:flex;align-items:center;justify-content:space-between;font-size:12px;flex-shrink:0}
+.user-bar .uinfo{display:flex;align-items:center;gap:6px}
+.user-bar .urole{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+.urole-admin{background:#22c55e22;color:#22c55e}
+.urole-finance{background:#f59e0b22;color:#f59e0b}
+.user-bar .logout-btn{background:none;border:1px solid #ef4444;color:#ef4444;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px}
 </style>
 </head>
 <body>
+<!-- ===== 登录页 ===== -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <h1>⚽ 足球注单分析</h1>
+    <div class="sub">请登录以继续</div>
+    <label>用户名</label>
+    <input id="loginUser" placeholder="请输入用户名" autocomplete="username">
+    <label>密码</label>
+    <input id="loginPass" type="password" placeholder="请输入密码" autocomplete="current-password">
+    <div class="err" id="loginErr"></div>
+    <button class="btn btn-a" style="margin-top:16px" onclick="doLogin()">登 录</button>
+    <div class="info">默认账户请联系管理员获取</div>
+  </div>
+</div>
 <!-- 汉堡菜单按钮 -->
 <button class="ham" id="hamBtn" onclick="toggleSB()">☰</button>
 <!-- 侧边栏遮罩 -->
 <div class="sb-ov" id="sbOv" onclick="toggleSB()"></div>
   <div class="sb">
-    <div class="sb-h"><h2>比赛列表</h2><button class="btn btn-a" onclick="showAdd()">+新增</button></div>
+    <div class="user-bar">
+      <div class="uinfo"><span id="userName" style="color:#e2e8f0;font-weight:600"></span><span id="userRole" class="urole"></span></div>
+      <button class="logout-btn" onclick="doLogout()">退出</button>
+    </div>
+    <div class="sb-h"><h2>比赛列表</h2><button class="btn btn-a admin-only-btn" onclick="showAdd()">+新增</button></div>
     <div class="ml" id="ml"></div>
     <div style="padding:8px 16px;border-top:1px solid #334155;display:flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8">
       <div id="syncDot" style="width:8px;height:8px;border-radius:50%;background:#64748b;flex-shrink:0"></div>
@@ -92,8 +131,8 @@ tr:hover{background:#1e293b}
     </div>
     <div style="padding:10px;border-top:1px solid #334155">
       <button class="btn btn-a" style="width:100%;margin-bottom:6px" onclick="manualSync()">手动同步</button>
-      <button class="btn btn-a" style="width:100%;margin-bottom:6px" onclick="exp()">导出</button>
-      <button class="btn btn-a" style="width:100%" onclick="imp()">导入</button>
+      <button class="btn btn-a admin-only-btn" style="width:100%;margin-bottom:6px" onclick="exp()">导出</button>
+      <button class="btn btn-a admin-only-btn" style="width:100%" onclick="imp()">导入</button>
     </div>
   </div>
   <div class="main">
@@ -139,6 +178,92 @@ tr:hover{background:#1e293b}
 </div>
 
 <script>
+
+// ===== 登录系统 =====
+let _auth = null; // { token, username, role, label }
+
+function getAuthToken() { return _auth ? _auth.token : null; }
+
+function setRoleBody() {
+  if (_auth) {
+    document.body.className = 'role-' + _auth.role;
+    document.getElementById('userName').textContent = _auth.username;
+    const roleEl = document.getElementById('userRole');
+    roleEl.textContent = _auth.label;
+    roleEl.className = 'urole urole-' + _auth.role;
+  }
+}
+
+async function doLogin() {
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginErr');
+  errEl.textContent = '';
+
+  if (!username || !password) {
+    errEl.textContent = '请输入用户名和密码';
+    return;
+  }
+
+  try {
+    const resp = await fetch(API_BASE + '/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      errEl.textContent = data.error || '登录失败';
+      return;
+    }
+
+    _auth = { token: data.token, username: data.username, role: data.role, label: data.label };
+    // 持久化令牌（24小时有效）
+    try { localStorage.setItem('fpnl3_auth', JSON.stringify(_auth)); } catch(e) {}
+
+    // 隐藏登录页，显示主界面
+    document.getElementById('loginWrap').style.display = 'none';
+    setRoleBody();
+    // 初始化主应用
+    init();
+  } catch(e) {
+    errEl.textContent = '网络错误，请检查连接';
+  }
+}
+
+function doLogout() {
+  _auth = null;
+  try { localStorage.removeItem('fpnl3_auth'); } catch(e) {}
+  document.getElementById('loginWrap').style.display = 'flex';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginErr').textContent = '';
+  document.body.className = '';
+}
+
+async function verifyStoredAuth() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('fpnl3_auth') || 'null');
+    if (!stored || !stored.token) return false;
+
+    // 验证令牌是否仍然有效
+    const resp = await fetch(API_BASE + '/api/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: stored.token })
+    });
+    if (!resp.ok) {
+      localStorage.removeItem('fpnl3_auth');
+      return false;
+    }
+
+    _auth = stored;
+    setRoleBody();
+    return true;
+  } catch(e) {
+    return false; // 离线模式：使用本地存储的令牌
+  }
+}
 
 // ===== 数据 =====
 const S = { ms:[], cid:null, cl:new Set(), lastClient:'', bl:{} };
@@ -1493,12 +1618,17 @@ function save() {
 
 async function saveToServer() {
   if (_isSyncing) return;
+  // 财务账户不能写入
+  if (_auth && _auth.role !== 'admin') return;
   _isSyncing = true;
   setSyncStatus('syncing');
   try {
+    const token = getAuthToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['x-auth-token'] = token;
     const resp = await fetch(API_BASE + '/api/data', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ ms: S.ms, cs: Array.from(S.cl), bl: S.bl, _version: _lastVersion })
     });
     if (resp.ok) {
@@ -1507,6 +1637,14 @@ async function saveToServer() {
       _lastVersion = r.version || 0;
       _conflictRetries = 0;
       setSyncStatus('online');
+    } else if (resp.status === 401) {
+      // 登录过期
+      setSyncStatus('error');
+      doLogout();
+    } else if (resp.status === 403) {
+      // 权限不足（财务账户尝试写入）
+      setSyncStatus('online');
+      console.warn('财务账户无写入权限，数据仅在本地保存');
     } else if (resp.status === 409) {
       // 并发冲突：自动合并冲突数据
       const r = await resp.json();
@@ -1722,7 +1860,20 @@ async function manualSync() {
   }
 }
 
-init();
+// 页面加载：先检查认证状态
+(async function bootstrap() {
+  const authed = await verifyStoredAuth();
+  if (authed) {
+    // 已验证，直接进入系统
+    document.getElementById('loginWrap').style.display = 'none';
+    setRoleBody();
+    init();
+  } else {
+    // 未登录，显示登录页
+    document.getElementById('loginWrap').style.display = 'flex';
+    document.getElementById('loginUser').focus();
+  }
+})();
 
 </script>
 

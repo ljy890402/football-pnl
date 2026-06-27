@@ -3,12 +3,93 @@ const fs = require('fs');
 const path = require('path');
 const cors = require('cors');
 
+const crypto = require('crypto');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
+const ACCOUNTS_FILE = path.join(__dirname, 'accounts.json');
 const BACKUP_DIR = path.join(__dirname, 'backups');
 const BACKUP_INTERVAL = 60 * 60 * 1000; // 每小时备份一次
 const START_TIME = Date.now();
+const TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 令牌有效期：24小时
+
+// ===== 账户管理 =====
+// 默认账户（密码用 SHA256 哈希存储）
+// admin = 下注账户（完整权限）/ finance = 财务账户（只读）
+let accounts = {};
+
+function loadAccounts() {
+  try {
+    if (fs.existsSync(ACCOUNTS_FILE)) {
+      accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
+    } else {
+      accounts = {};
+      resetDefaultAccounts();
+    }
+  } catch (e) {
+    accounts = {};
+    resetDefaultAccounts();
+  }
+}
+
+function saveAccounts() {
+  fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(accounts, null, 2));
+}
+
+function resetDefaultAccounts() {
+  accounts = {};
+  // 下注账户：admin / admin123
+  addAccount('admin', 'admin123', 'admin', '下注账户');
+  // 财务账户：finance / finance123
+  addAccount('finance', 'finance123', 'finance', '财务账户');
+  saveAccounts();
+}
+
+function addAccount(username, password, role, label) {
+  accounts[username] = {
+    password: hash(password),
+    role,
+    label,
+    createdAt: Date.now()
+  };
+}
+
+function hash(str) {
+  return crypto.createHash('sha256').update(str).digest('hex');
+}
+
+// ===== 令牌管理 =====
+const tokens = {}; // token -> { username, role, label, expiresAt }
+
+function createToken(username, account) {
+  const token = crypto.randomBytes(32).toString('hex');
+  tokens[token] = {
+    username,
+    role: account.role,
+    label: account.label,
+    expiresAt: Date.now() + TOKEN_EXPIRY
+  };
+  // 定期清理过期令牌
+  cleanTokens();
+  return token;
+}
+
+function verifyToken(token) {
+  if (!token || !tokens[token]) return null;
+  if (Date.now() > tokens[token].expiresAt) {
+    delete tokens[token];
+    return null;
+  }
+  return tokens[token];
+}
+
+function cleanTokens() {
+  const now = Date.now();
+  for (const t in tokens) {
+    if (tokens[t].expiresAt < now) delete tokens[t];
+  }
+}
 
 // ===== 中间件 =====
 app.use(cors());
@@ -107,8 +188,89 @@ function createBackup() {
 
 setInterval(createBackup, BACKUP_INTERVAL);
 createBackup(); // 启动时立即备份一次
+loadAccounts(); // 加载账户
 
 // ===== API =====
+
+// 登录
+app.post('/api/login', (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).json({ error: '请输入用户名和密码' });
+    }
+
+    const account = accounts[username];
+    if (!account) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+
+    if (account.password !== hash(String(password))) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+
+    const token = createToken(username, account);
+    res.json({
+      ok: true,
+      token,
+      username,
+      role: account.role,
+      label: account.label
+    });
+  } catch (e) {
+    console.error('登录错误:', e.message);
+    res.status(500).json({ error: '登录失败' });
+  }
+});
+
+// 验证令牌
+app.post('/api/verify', (req, res) => {
+  try {
+    const { token } = req.body || {};
+    const session = verifyToken(token);
+    if (!session) {
+      return res.status(401).json({ error: '登录已过期，请重新登录' });
+    }
+    res.json({
+      ok: true,
+      username: session.username,
+      role: session.role,
+      label: session.label
+    });
+  } catch (e) {
+    res.status(500).json({ error: '验证失败' });
+  }
+});
+
+// 修改密码
+app.post('/api/change-password', (req, res) => {
+  try {
+    const { token, oldPassword, newPassword } = req.body || {};
+    const session = verifyToken(token);
+    if (!session) {
+      return res.status(401).json({ error: '登录已过期，请重新登录' });
+    }
+
+    const account = accounts[session.username];
+    if (!account) {
+      return res.status(404).json({ error: '账户不存在' });
+    }
+
+    if (account.password !== hash(String(oldPassword))) {
+      return res.status(403).json({ error: '原密码错误' });
+    }
+
+    if (!newPassword || String(newPassword).length < 4) {
+      return res.status(400).json({ error: '新密码至少4位' });
+    }
+
+    account.password = hash(String(newPassword));
+    saveAccounts();
+    res.json({ ok: true, message: '密码修改成功' });
+  } catch (e) {
+    res.status(500).json({ error: '修改失败' });
+  }
+});
 
 // 健康检查
 app.get('/api/health', (req, res) => {
@@ -141,8 +303,19 @@ app.get('/api/data', (req, res) => {
 });
 
 // 保存全部数据（带版本检查，防并发冲突）
+// 需要登录 + admin 角色
 app.put('/api/data', (req, res) => {
   try {
+    // ===== 权限检查 =====
+    const token = req.headers['x-auth-token'] || req.body?._token;
+    const session = verifyToken(token);
+    if (!session) {
+      return res.status(401).json({ error: '请先登录' });
+    }
+    if (session.role !== 'admin') {
+      return res.status(403).json({ error: '财务账户无权限修改数据' });
+    }
+
     const incoming = req.body;
 
     // 基本格式验证

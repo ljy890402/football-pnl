@@ -1,5 +1,6 @@
 # .gitignore
 node_modules/
 data.json
+accounts.json
 *.log
 backups/
