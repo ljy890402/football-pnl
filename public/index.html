@@ -251,6 +251,7 @@ tr:hover{background:#1e293b}
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 
 // ===== 登录系统 =====
@@ -361,6 +362,7 @@ function resetOCR() {
   document.getElementById('ocrStartBtn').style.display = '';
   document.getElementById('ocrRunBtn').disabled = true;
   document.getElementById('ocrBar').style.width = '0%';
+  document.getElementById('ocrBar').style.background = 'linear-gradient(90deg,#38bdf8,#818cf8)';
   document.getElementById('ocrStatus').textContent = '';
   document.getElementById('ocrFile').value = '';
   document.getElementById('ocrCsArea').innerHTML = '<p style="color:#64748b;font-size:12px">未识别到波胆数据</p>';
@@ -401,83 +403,44 @@ async function startOCR() {
   if (!_ocrImageData) return;
   document.getElementById('ocrProgress').style.display = '';
   document.getElementById('ocrStartBtn').style.display = 'none';
-  document.getElementById('ocrBar').style.width = '5%';
-  document.getElementById('ocrStatus').textContent = '正在上传图片...';
+  document.getElementById('ocrBar').style.width = '2%';
+  document.getElementById('ocrBar').style.background = 'linear-gradient(90deg,#38bdf8,#818cf8)';
+  document.getElementById('ocrStatus').textContent = '正在初始化识别引擎...';
 
   try {
-    document.getElementById('ocrBar').style.width = '15%';
-    document.getElementById('ocrStatus').textContent = '正在识别文字（可能需要10-30秒）...';
+    document.getElementById('ocrBar').style.width = '5%';
+    document.getElementById('ocrStatus').textContent = '正在加载语言数据（首次约需下载 4MB）...';
 
-    const token = getAuthToken();
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['x-auth-token'] = token;
-
-    const resp = await fetch(API_BASE + '/api/ocr', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ image: _ocrImageData })
+    // 浏览器端 OCR（不依赖服务器，Railway 内存不够也能用）
+    const { data: { text } } = await Tesseract.recognize(_ocrImageData, 'eng', {
+      logger: m => {
+        if (m.status === 'loading tesseract core') {
+          document.getElementById('ocrBar').style.width = '10%';
+          document.getElementById('ocrStatus').textContent = '加载核心引擎...';
+        } else if (m.status === 'initializing tesseract') {
+          document.getElementById('ocrBar').style.width = '15%';
+          document.getElementById('ocrStatus').textContent = '初始化引擎...';
+        } else if (m.status === 'loading language traineddata') {
+          document.getElementById('ocrBar').style.width = Math.round(15 + m.progress * 25) + '%';
+          document.getElementById('ocrStatus').textContent = '下载语言数据 ' + Math.round(m.progress * 100) + '%...';
+        } else if (m.status === 'initializing api') {
+          document.getElementById('ocrBar').style.width = '40%';
+          document.getElementById('ocrStatus').textContent = '初始化 API...';
+        } else if (m.status === 'recognizing text') {
+          document.getElementById('ocrBar').style.width = Math.round(40 + m.progress * 55) + '%';
+          document.getElementById('ocrStatus').textContent = '识别文字 ' + Math.round(m.progress * 100) + '%...';
+        }
+      }
     });
 
-    document.getElementById('ocrBar').style.width = '90%';
-
-    if (!resp.ok) {
-      const err = await resp.json();
-      throw new Error(err.error || '识别失败');
-    }
-
-    const data = await resp.json();
     document.getElementById('ocrBar').style.width = '100%';
     document.getElementById('ocrStatus').textContent = '识别完成！';
 
-    // 填充结果
-    const p = data.parsed;
-    document.getElementById('ocrHome').value = p.homeTeam || '';
-    document.getElementById('ocrAway').value = p.awayTeam || '';
+    console.log('OCR 原始结果:\n' + text);
 
-    // 处理时间
-    if (p.time) {
-      const now = new Date();
-      const t = p.time.match(/(\d{1,2})[-\/](\d{1,2})\s+(\d{1,2}):(\d{2})/);
-      if (t) {
-        const mo = parseInt(t[1]), d = parseInt(t[2]), h = parseInt(t[3]), m = parseInt(t[4]);
-        const yr = now.getFullYear();
-        const dt = new Date(yr, mo-1, d, h, m);
-        document.getElementById('ocrTime').value = dt.toISOString().slice(0,16);
-      }
-    }
-
-    if (p.odds['1x2']) {
-      document.getElementById('ocr1x2h').value = p.odds['1x2'].home;
-      document.getElementById('ocr1x2d').value = p.odds['1x2'].draw;
-      document.getElementById('ocr1x2a').value = p.odds['1x2'].away;
-    }
-    if (p.odds.ah) {
-      document.getElementById('ocrAhL').value = p.odds.ah.line;
-      document.getElementById('ocrAhH').value = p.odds.ah.home;
-      document.getElementById('ocrAhA').value = p.odds.ah.away;
-    }
-    if (p.odds.ou) {
-      document.getElementById('ocrOuL').value = p.odds.ou.line;
-      document.getElementById('ocrOuO').value = p.odds.ou.over;
-      document.getElementById('ocrOuU').value = p.odds.ou.under;
-    }
-
-    if (p.odds.cs && p.odds.cs.length) {
-      let csHtml = '<table style="width:100%;font-size:12px;border-collapse:collapse">';
-      // 按赔率升序排列
-      const csList = p.odds.cs.sort((a,b) => a.odds - b.odds);
-      // 每行2列
-      for (let i = 0; i < csList.length; i += 2) {
-        csHtml += '<tr>';
-        csHtml += '<td style="padding:3px 6px"><span style="color:#38bdf8;font-weight:700">'+csList[i].score+'</span> <span style="color:#fbbf24">'+csList[i].odds.toFixed(2)+'</span></td>';
-        if (i+1 < csList.length) {
-          csHtml += '<td style="padding:3px 6px"><span style="color:#38bdf8;font-weight:700">'+csList[i+1].score+'</span> <span style="color:#fbbf24">'+csList[i+1].odds.toFixed(2)+'</span></td>';
-        }
-        csHtml += '</tr>';
-      }
-      csHtml += '</table>';
-      document.getElementById('ocrCsArea').innerHTML = csHtml;
-    }
+    // 客户端解析（用和服务端相同的 parseOddsText 逻辑的内联版）
+    const parsed = parseOddsTextClient(text);
+    fillOCRForm(parsed);
 
     // 显示结果和按钮
     document.getElementById('ocrProgress').style.display = 'none';
@@ -485,10 +448,150 @@ async function startOCR() {
     document.getElementById('ocrBtns').style.display = '';
 
   } catch(e) {
-    document.getElementById('ocrStatus').textContent = '❌ ' + e.message;
+    console.error('OCR error:', e);
+    document.getElementById('ocrStatus').textContent = '❌ ' + (e.message || '识别失败，请重试');
     document.getElementById('ocrBar').style.background = '#ef4444';
     document.getElementById('ocrStartBtn').style.display = '';
     document.getElementById('ocrRunBtn').disabled = false;
+  }
+}
+
+// 客户端赔率文本解析（与服务端 parseOddsText 相同逻辑）
+function parseOddsTextClient(text) {
+  const result = { homeTeam: '', awayTeam: '', time: '', odds: {} };
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // 球队名称
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const line = lines[i];
+    const vsMatch = line.match(/(.+?)\s*[vV][sS]\s*(.+)/);
+    if (vsMatch) {
+      result.homeTeam = vsMatch[1].trim();
+      result.awayTeam = vsMatch[2].trim().replace(/\d+$/, '').trim();
+      break;
+    }
+    const vMatch = line.match(/(.+?)\s+[vV]\s+(.+)/);
+    if (vMatch && !result.homeTeam) {
+      result.homeTeam = vMatch[1].trim();
+      result.awayTeam = vMatch[2].trim().split(/\d/)[0].trim();
+    }
+  }
+  if (!result.homeTeam && lines.length >= 2) {
+    const candidates = lines.slice(0, 4).filter(l => l.length > 3 && !/^\d/.test(l) && !/赔率|盘口|odds/i.test(l));
+    if (candidates.length >= 2) {
+      result.homeTeam = candidates[0];
+      result.awayTeam = candidates[1].split(/\d/)[0].trim();
+    }
+  }
+
+  // 时间
+  for (const line of lines) {
+    const m = line.match(/(\d{1,2}[-\/]\d{1,2}\s+\d{1,2}:\d{2})/);
+    if (m) { result.time = m[1]; break; }
+  }
+
+  // 欧赔 1x2
+  for (const line of lines) {
+    const m = line.match(/(\d+\.\d{2})\s*[\/\s]\s*(\d+\.\d{2})\s*[\/\s]\s*(\d+\.\d{2})/);
+    if (m) {
+      const h = parseFloat(m[1]), d = parseFloat(m[2]), a = parseFloat(m[3]);
+      if (h > 1 && h < 100 && d > 1 && d < 100 && a > 1 && a < 100) {
+        result.odds['1x2'] = { home: h, draw: d, away: a };
+        break;
+      }
+    }
+  }
+
+  // 亚盘
+  for (const line of lines) {
+    const m = line.match(/([-+]?\d+\.?\d*)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
+    if (m) {
+      const lv = parseFloat(m[1]), ho = parseFloat(m[2]), ao = parseFloat(m[3]);
+      if (Math.abs(lv) <= 5 && ho > 0.5 && ao > 0.5) {
+        result.odds.ah = { line: lv, home: ho, away: ao };
+        break;
+      }
+    }
+  }
+
+  // 大小球
+  for (const line of lines) {
+    const m = line.match(/[Oo]\s*[\/]\s*[Uu]\s*(\d+\.?\d*)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
+    if (m) {
+      result.odds.ou = { line: parseFloat(m[1]), over: parseFloat(m[2]), under: parseFloat(m[3]) };
+      break;
+    }
+  }
+
+  // 波胆 (格式: 1-0 8.00, 2-1 9.50)
+  const csList = [];
+  for (const line of lines) {
+    const m = line.match(/(\d+\s*[-:]\s*\d+)\s+(\d+\.?\d{0,2})/);
+    if (m) {
+      const score = m[1].replace(/\s+/g, '');
+      const ov = parseFloat(m[2]);
+      if (ov > 1 && ov < 999) csList.push({ score, odds: ov });
+    }
+    const om = line.match(/其他\s+(\d+\.?\d{0,2})/);
+    if (om) {
+      const ov = parseFloat(om[1]);
+      if (ov > 1 && ov < 999) csList.push({ score: '其他', odds: ov });
+    }
+  }
+  if (csList.length >= 3) {
+    const seen = new Set();
+    result.odds.cs = csList.filter(x => { if (seen.has(x.score)) return false; seen.add(x.score); return true; });
+  }
+
+  console.log('客户端解析结果:', JSON.stringify(result, null, 2));
+  return result;
+}
+
+// 填充 OCR 识别结果到表单
+function fillOCRForm(p) {
+  document.getElementById('ocrHome').value = p.homeTeam || '';
+  document.getElementById('ocrAway').value = p.awayTeam || '';
+
+  if (p.time) {
+    const now = new Date();
+    const t = p.time.match(/(\d{1,2})[-\/](\d{1,2})\s+(\d{1,2}):(\d{2})/);
+    if (t) {
+      const dt = new Date(now.getFullYear(), parseInt(t[1])-1, parseInt(t[2]), parseInt(t[3]), parseInt(t[4]));
+      document.getElementById('ocrTime').value = dt.toISOString().slice(0,16);
+    }
+  }
+
+  if (p.odds['1x2']) {
+    document.getElementById('ocr1x2h').value = p.odds['1x2'].home;
+    document.getElementById('ocr1x2d').value = p.odds['1x2'].draw;
+    document.getElementById('ocr1x2a').value = p.odds['1x2'].away;
+  }
+  if (p.odds.ah) {
+    document.getElementById('ocrAhL').value = p.odds.ah.line;
+    document.getElementById('ocrAhH').value = p.odds.ah.home;
+    document.getElementById('ocrAhA').value = p.odds.ah.away;
+  }
+  if (p.odds.ou) {
+    document.getElementById('ocrOuL').value = p.odds.ou.line;
+    document.getElementById('ocrOuO').value = p.odds.ou.over;
+    document.getElementById('ocrOuU').value = p.odds.ou.under;
+  }
+
+  if (p.odds.cs && p.odds.cs.length) {
+    let csHtml = '<table style="width:100%;font-size:12px;border-collapse:collapse">';
+    const csList = p.odds.cs.sort((a,b) => a.odds - b.odds);
+    for (let i = 0; i < csList.length; i += 2) {
+      csHtml += '<tr>';
+      csHtml += '<td style="padding:3px 6px"><span style="color:#38bdf8;font-weight:700">'+csList[i].score+'</span> <span style="color:#fbbf24">'+csList[i].odds.toFixed(2)+'</span></td>';
+      if (i+1 < csList.length) {
+        csHtml += '<td style="padding:3px 6px"><span style="color:#38bdf8;font-weight:700">'+csList[i+1].score+'</span> <span style="color:#fbbf24">'+csList[i+1].odds.toFixed(2)+'</span></td>';
+      }
+      csHtml += '</tr>';
+    }
+    csHtml += '</table>';
+    document.getElementById('ocrCsArea').innerHTML = csHtml;
+  } else {
+    document.getElementById('ocrCsArea').innerHTML = '<p style="color:#64748b;font-size:12px">未识别到波胆数据</p>';
   }
 }
 
