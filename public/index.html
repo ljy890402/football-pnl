@@ -2816,8 +2816,8 @@ function save() {
 
 async function saveToServer() {
   if (_isSyncing) return;
-  // 财务账户不能写入
-  if (_auth && _auth.role !== 'admin') return;
+  // 所有已登录用户都可以同步数据到服务器（服务器端会验证权限）
+  if (!_auth) return; // 未登录时不同步
   _isSyncing = true;
   setSyncStatus('syncing');
   try {
