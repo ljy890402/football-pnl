@@ -861,6 +861,17 @@ async function doOCRSave() {
     }
   }
 
+  // 为每笔注单分配下注时间（相隔1~10分钟，最早的最先）
+  const baseTime = Date.now() - gen.length * 8 * 60 * 1000; // 从约 N*8 分钟前开始
+  let cursor = baseTime;
+  for (let i = 0; i < gen.length; i++) {
+    cursor += (1 + Math.floor(Math.random() * 10)) * 60 * 1000; // 加 1~10 分钟
+    gen[i].createdAt = new Date(cursor).toISOString();
+    gen[i].time = new Date(cursor).toTimeString().slice(0, 5);
+  }
+  // 按时间排序，确保最新的在前
+  gen.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
   m.bets.push(...gen); used.forEach(c => S.cl.add(c)); save();
   hideOCR(); renderList(); switchMatch(m.id);
 
@@ -1597,11 +1608,12 @@ function fmtTime(iso) {
 }
 function renderBetTable(bets, m) {
   const hasRes = m.res && (isFullTimeSet(m.res) || isHalfTimeSet(m.res));
-  let h = '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>金额</th><th>赔率</th><th>可赢</th><th>下注时间</th><th>结算状态</th><th>操作</th></tr></thead><tbody>';
+  let h = '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>盘口</th><th>金额</th><th>赔率</th><th>可赢</th><th>下注时间</th><th>结算状态</th><th>操作</th></tr></thead><tbody>';
   h += bets.map(b => {
     const pt = PC[b.pt] || {n:b.pt};
     const winAmt = calcWinAmt(b.amt, b.odds);
     const timeStr = fmtTime(b.createdAt) || (b.time ? '今天 '+b.time : '-');
+    const hcStr = b.hc ? String(b.hc) : '-';
     // 结算状态
     let settleStr = '';
     if (b.settled) {
@@ -1612,7 +1624,7 @@ function renderBetTable(bets, m) {
     } else {
       settleStr = '<button class="btn" style="background:#38bdf8;color:#fff;font-size:11px;padding:3px 8px" onclick="doSettleBet(\''+m.id+'\',\''+b.id+'\')">结算</button>';
     }
-    return '<tr><td>'+b.client+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td>'+b.amt+'</td><td>'+b.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
+    return '<tr><td>'+b.client+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td style="font-size:12px;color:#94a3b8">'+hcStr+'</td><td>'+b.amt+'</td><td>'+b.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
       '<td style="font-size:12px;color:#94a3b8;white-space:nowrap">'+timeStr+'</td>' +
       '<td>'+settleStr+'</td>' +
       '<td><button class="btn" style="background:#3b82f6;color:#fff;font-size:11px;padding:3px 8px" onclick="editBet(\''+m.id+'\',\''+b.id+'\')">编辑</button>' +
@@ -1642,7 +1654,13 @@ function editBet(mid, bid) {
   document.getElementById('editBetOpt').textContent = b.opt + (b.hc ? '（盘口'+b.hc+'）' : '');
   document.getElementById('editBetAmt').value = b.amt;
   document.getElementById('editBetOdds').value = b.odds;
-  document.getElementById('editBetTime').value = (b.time || '') || (b.createdAt ? new Date(b.createdAt).toTimeString().slice(0,5) : '');
+  // 时间：优先用 createdAt 解析出 HH:MM，其次用 b.time
+  let timeVal = '';
+  if (b.createdAt) {
+    try { timeVal = new Date(b.createdAt).toTimeString().slice(0,5); } catch(e) {}
+  }
+  if (!timeVal && b.time) timeVal = b.time;
+  document.getElementById('editBetTime').value = timeVal;
   // 盘口
   const hcWrap = document.getElementById('editBetHcWrap');
   if (b.hc) { hcWrap.style.display = ''; document.getElementById('editBetHc').value = b.hc; }
@@ -1669,7 +1687,15 @@ function doEditBetSave() {
   b.client = client;
   b.amt = amt;
   b.odds = odds;
+  // 同步时间：更新 b.time 和 b.createdAt
   b.time = time;
+  if (time && b.createdAt) {
+    // 保持原日期，替换时间部分
+    const d = new Date(b.createdAt);
+    const parts = time.split(':');
+    d.setHours(parseInt(parts[0])||0, parseInt(parts[1])||0, 0, 0);
+    b.createdAt = d.toISOString();
+  }
   if (b.hc !== undefined) b.hc = document.getElementById('editBetHc').value || b.hc;
   b.updatedAt = new Date().toISOString();
   S.cl.add(client);
@@ -2331,12 +2357,13 @@ function renderSettleSection(m, bets, res, h, a, title, color) {
   h2 += '<div class="sc"><div class="v" style="color:'+(pay>0?'#ef4444':'#22c55e')+'">'+pay.toFixed(0)+'</div><div class="l">赔付</div></div>';
   h2 += '<div class="sc"><div class="v" style="color:'+(net>=0?'#22c55e':'#ef4444')+'">'+(net>=0?'+':'')+net.toFixed(0)+'</div><div class="l">净利润</div></div>';
   h2 += '</div>';
-  h2 += '<table style="margin-top:10px"><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>金额</th><th>赔率</th><th>可赢</th><th>结果</th><th>赔付</th><th>盈亏</th></tr></thead><tbody>';
+  h2 += '<table style="margin-top:10px"><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>盘口</th><th>金额</th><th>赔率</th><th>可赢</th><th>结果</th><th>赔付</th><th>盈亏</th></tr></thead><tbody>';
   h2 += results.map(r => {
     const pt = PC[r.pt]||{n:r.pt};
+    const hcStr = r.hc ? String(r.hc) : '-';
     const winAmt = r.res==='pending' ? calcWinAmt(r.amt, r.odds) : (r.res==='win'||r.res==='half-win') ? (r.pay - r.amt).toFixed(0) : '-';
     const tagClass = r.res==='pending' ? 't-pn' : (r.res==='win'?'t-w':r.res==='lose'?'t-l':'t-p');
-    return '<tr><td>'+r.client+'</td><td>'+pt.n+'</td><td>'+r.opt+'</td><td>'+r.amt+'</td><td>'+r.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
+    return '<tr><td>'+r.client+'</td><td>'+pt.n+'</td><td>'+r.opt+'</td><td style="font-size:12px;color:#94a3b8">'+hcStr+'</td><td>'+r.amt+'</td><td>'+r.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
       '<td><span class="tag '+tagClass+'">'+resLabel(r.res)+'</span></td>' +
       '<td>'+(r.pay>0?r.pay.toFixed(1):'-')+'</td>' +
       '<td style="color:'+(r.net===null?'#94a3b8':(r.net>=0?'#22c55e':'#ef4444'))+';font-weight:600">'+(r.net===null?'待结算':(r.net>=0?'+':'')+r.net.toFixed(0))+'</td></tr>';
