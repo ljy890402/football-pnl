@@ -865,7 +865,7 @@ async function doOCRSave() {
   const baseTime = Date.now() - gen.length * 8 * 60 * 1000; // 从约 N*8 分钟前开始
   let cursor = baseTime;
   for (let i = 0; i < gen.length; i++) {
-    cursor += (1 + Math.floor(Math.random() * 10)) * 60 * 1000; // 加 1~10 分钟
+    cursor += (10 + Math.floor(Math.random() * 51)) * 1000; // 加 10秒~1分钟
     gen[i].createdAt = new Date(cursor).toISOString();
     gen[i].time = new Date(cursor).toTimeString().slice(0, 5);
   }
