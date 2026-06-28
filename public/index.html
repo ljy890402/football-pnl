@@ -755,6 +755,8 @@ async function doOCRSave() {
   // 确保玩法启用
   for (const pt of new Set(all.map(o=>o.pt))) { if (!m.pts.includes(pt)) m.pts.push(pt); }
 
+  const actualClients = Math.min(numClients, CLIENTS.length);
+
   // 随机选取客户
   const pool = [...CLIENTS].sort(() => Math.random() - 0.5);
   const selected = pool.slice(0, actualClients);
