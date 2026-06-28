@@ -755,12 +755,10 @@ async function doOCRSave() {
   // 确保玩法启用
   for (const pt of new Set(all.map(o=>o.pt))) { if (!m.pts.includes(pt)) m.pts.push(pt); }
 
-  // 40个客户名（男性为主，中英文混合）
+  // 20个客户名（三字中文）
   const CLIENTS = [
-    '张浩','王磊','李强','刘军','陈刚','杨勇','赵峰','黄伟','周鹏','吴杰',
-    '徐明','孙鑫','马腾','朱俊','胡涛','郭靖','林峰','何军','罗刚','梁超',
-    '宋磊','郑辉','谢宇','韩龙','唐飞','冯刚','董伟','萧然','曹磊','袁涛',
-    'David','Tom','Jack','Mike','Alex','王芳','李娜','陈静','赵敏','刘洋'
+    '张浩宇','王磊明','李强飞','刘军辉','陈刚毅','杨勇杰','赵峰云','黄伟涛','周鹏程','吴杰伦',
+    '徐明轩','孙鑫磊','马腾飞','朱俊杰','胡涛声','郭靖远','林峰岚','何军胜','罗刚毅','梁超群'
   ];
 
   const actualClients = Math.min(numClients, CLIENTS.length);
@@ -865,7 +863,7 @@ async function doOCRSave() {
   const baseTime = Date.now() - gen.length * 8 * 60 * 1000; // 从约 N*8 分钟前开始
   let cursor = baseTime;
   for (let i = 0; i < gen.length; i++) {
-    cursor += (10 + Math.floor(Math.random() * 51)) * 1000; // 加 10秒~1分钟
+    cursor += (30 + Math.floor(Math.random() * 91)) * 1000; // 加 30秒~2分钟
     gen[i].createdAt = new Date(cursor).toISOString();
     gen[i].time = new Date(cursor).toTimeString().slice(0, 5);
   }
