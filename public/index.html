@@ -270,6 +270,53 @@ tr:hover{background:#1e293b}
   </div>
 </div>
 
+<!-- 编辑注单弹窗 -->
+<div class="modal-o" id="editBetM" style="display:none">
+  <div class="modal-c" style="max-width:480px">
+    <h3 style="color:#38bdf8;margin-bottom:14px">✏️ 编辑注单</h3>
+    <input id="editBetMid" type="hidden">
+    <input id="editBetBid" type="hidden">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="flex:1;min-width:140px">
+        <label style="font-size:13px;color:#94a3b8">客户</label>
+        <input id="editBetClient" style="margin-top:4px;width:100%">
+      </div>
+      <div style="flex:1;min-width:140px">
+        <label style="font-size:13px;color:#94a3b8">玩法</label>
+        <div id="editBetPt" style="margin-top:8px;font-size:14px;color:#e2e8f0"></div>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:13px;color:#94a3b8">选项</label>
+      <div id="editBetOpt" style="margin-top:8px;font-size:14px;color:#e2e8f0"></div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="flex:1;min-width:100px">
+        <label style="font-size:13px;color:#94a3b8">金额</label>
+        <input id="editBetAmt" type="number" min="1" style="margin-top:4px;width:100%">
+      </div>
+      <div style="flex:1;min-width:100px">
+        <label style="font-size:13px;color:#94a3b8">赔率</label>
+        <input id="editBetOdds" type="number" min="1" step="0.01" style="margin-top:4px;width:100%">
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="flex:1;min-width:140px">
+        <label style="font-size:13px;color:#94a3b8">时间</label>
+        <input id="editBetTime" type="time" style="margin-top:4px;width:100%">
+      </div>
+      <div style="flex:1;min-width:140px" id="editBetHcWrap" style="display:none">
+        <label style="font-size:13px;color:#94a3b8">盘口</label>
+        <input id="editBetHc" placeholder="如：-0.5 或 3/3.5" style="margin-top:4px;width:100%">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-a" style="flex:1" onclick="doEditBetSave()">💾 保存</button>
+      <button class="btn" style="background:#ef4444;color:#fff;flex:1" onclick="hideEditBet()">取消</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 
@@ -1544,12 +1591,17 @@ function calcWinPreview() {
 }
 
 // ===== 注单表格 =====
+function fmtTime(iso) {
+  if (!iso) return '-';
+  try { return new Date(iso).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); } catch(e) { return iso; }
+}
 function renderBetTable(bets, m) {
   const hasRes = m.res && (isFullTimeSet(m.res) || isHalfTimeSet(m.res));
-  let h = '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>金额</th><th>赔率</th><th>可赢</th><th>结算状态</th><th>操作</th></tr></thead><tbody>';
+  let h = '<table><thead><tr><th>客户</th><th>玩法</th><th>选项</th><th>金额</th><th>赔率</th><th>可赢</th><th>下注时间</th><th>结算状态</th><th>操作</th></tr></thead><tbody>';
   h += bets.map(b => {
     const pt = PC[b.pt] || {n:b.pt};
     const winAmt = calcWinAmt(b.amt, b.odds);
+    const timeStr = fmtTime(b.createdAt) || (b.time ? '今天 '+b.time : '-');
     // 结算状态
     let settleStr = '';
     if (b.settled) {
@@ -1561,8 +1613,10 @@ function renderBetTable(bets, m) {
       settleStr = '<button class="btn" style="background:#38bdf8;color:#fff;font-size:11px;padding:3px 8px" onclick="doSettleBet(\''+m.id+'\',\''+b.id+'\')">结算</button>';
     }
     return '<tr><td>'+b.client+'</td><td>'+pt.n+'</td><td>'+b.opt+'</td><td>'+b.amt+'</td><td>'+b.odds+'</td><td style="color:#22c55e;font-weight:600">'+winAmt+'</td>' +
+      '<td style="font-size:12px;color:#94a3b8;white-space:nowrap">'+timeStr+'</td>' +
       '<td>'+settleStr+'</td>' +
-      '<td><button class="btn admin-only-btn" style="background:#ef4444;color:#fff;font-size:11px;padding:3px 8px" onclick="delBet(\''+m.id+'\',\''+b.id+'\')">删除</button>' +
+      '<td><button class="btn" style="background:#3b82f6;color:#fff;font-size:11px;padding:3px 8px" onclick="editBet(\''+m.id+'\',\''+b.id+'\')">编辑</button>' +
+      '<button class="btn admin-only-btn" style="background:#ef4444;color:#fff;font-size:11px;padding:3px 8px;margin-left:4px" onclick="delBet(\''+m.id+'\',\''+b.id+'\')">删除</button>' +
       (b.settled ? '<button class="btn" style="background:#94a3b8;color:#fff;font-size:11px;padding:3px 8px;margin-left:4px" onclick="undoSettle(\''+m.id+'\',\''+b.id+'\')">撤销</button>' : '') +
       '</td></tr>';
   }).join('');
@@ -1575,6 +1629,55 @@ function delBet(mid, bid) {
   const m = S.ms.find(x => x.id === mid); if (!m) return;
   m.bets = m.bets.filter(b => b.id !== bid);
   save(); renderList(); switchTab('bets');
+}
+
+// ===== 编辑注单 =====
+function editBet(mid, bid) {
+  const m = S.ms.find(x => x.id === mid); if (!m) return;
+  const b = m.bets.find(x => x.id === bid); if (!b) return;
+  document.getElementById('editBetMid').value = mid;
+  document.getElementById('editBetBid').value = bid;
+  document.getElementById('editBetClient').value = b.client;
+  document.getElementById('editBetPt').textContent = (PC[b.pt]||{}).n || b.pt;
+  document.getElementById('editBetOpt').textContent = b.opt + (b.hc ? '（盘口'+b.hc+'）' : '');
+  document.getElementById('editBetAmt').value = b.amt;
+  document.getElementById('editBetOdds').value = b.odds;
+  document.getElementById('editBetTime').value = (b.time || '') || (b.createdAt ? new Date(b.createdAt).toTimeString().slice(0,5) : '');
+  // 盘口
+  const hcWrap = document.getElementById('editBetHcWrap');
+  if (b.hc) { hcWrap.style.display = ''; document.getElementById('editBetHc').value = b.hc; }
+  else { hcWrap.style.display = 'none'; }
+  document.getElementById('editBetM').style.display = 'flex';
+}
+
+function hideEditBet() {
+  document.getElementById('editBetM').style.display = 'none';
+}
+
+function doEditBetSave() {
+  const mid = document.getElementById('editBetMid').value;
+  const bid = document.getElementById('editBetBid').value;
+  const m = S.ms.find(x => x.id === mid); if (!m) return;
+  const b = m.bets.find(x => x.id === bid); if (!b) return;
+  const client = document.getElementById('editBetClient').value.trim();
+  const amt = parseInt(document.getElementById('editBetAmt').value);
+  const odds = parseFloat(document.getElementById('editBetOdds').value);
+  const time = document.getElementById('editBetTime').value;
+  if (!client) return alert('请输入客户');
+  if (!amt || amt <= 0) return alert('请输入有效金额');
+  if (!odds || odds < 1) return alert('请输入有效赔率');
+  b.client = client;
+  b.amt = amt;
+  b.odds = odds;
+  b.time = time;
+  if (b.hc !== undefined) b.hc = document.getElementById('editBetHc').value || b.hc;
+  b.updatedAt = new Date().toISOString();
+  S.cl.add(client);
+  save(); renderList();
+  const cur = document.querySelector('#tabs .tab.act');
+  if (cur) switchTab(cur.getAttribute('dt'));
+  hideEditBet();
+  alert('✅ 注单已更新');
 }
 
 function doSettleBet(mid, bid) {
