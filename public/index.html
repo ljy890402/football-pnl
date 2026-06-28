@@ -272,7 +272,7 @@ tr:hover{background:#1e293b}
 
 <!-- 编辑注单弹窗 -->
 <div class="modal-o" id="editBetM" style="display:none">
-  <div class="modal-c" style="max-width:480px">
+  <div class="modal-c" style="max-width:520px">
     <h3 style="color:#38bdf8;margin-bottom:14px">✏️ 编辑注单</h3>
     <input id="editBetMid" type="hidden">
     <input id="editBetBid" type="hidden">
@@ -283,10 +283,10 @@ tr:hover{background:#1e293b}
       </div>
       <div style="flex:1;min-width:140px">
         <label style="font-size:13px;color:#94a3b8">玩法</label>
-        <div id="editBetPt" style="margin-top:8px;font-size:14px;color:#e2e8f0"></div>
+        <select id="editBetPtSel" onchange="onEditPtChange()" style="margin-top:4px;width:100%"></select>
       </div>
     </div>
-    <div style="margin-bottom:10px">
+    <div id="editOptWrap" style="margin-bottom:10px">
       <label style="font-size:13px;color:#94a3b8">选项</label>
       <div id="editBetOpt" style="margin-top:8px;font-size:14px;color:#e2e8f0"></div>
     </div>
@@ -755,10 +755,12 @@ async function doOCRSave() {
   // 确保玩法启用
   for (const pt of new Set(all.map(o=>o.pt))) { if (!m.pts.includes(pt)) m.pts.push(pt); }
 
-  // 20个客户名（三字中文）
+  // 40个客户名（三字中文）
   const CLIENTS = [
     '张浩宇','王磊明','李强飞','刘军辉','陈刚毅','杨勇杰','赵峰云','黄伟涛','周鹏程','吴杰伦',
-    '徐明轩','孙鑫磊','马腾飞','朱俊杰','胡涛声','郭靖远','林峰岚','何军胜','罗刚毅','梁超群'
+    '徐明轩','孙鑫磊','马腾飞','朱俊杰','胡涛声','郭靖远','林峰岚','何军胜','罗刚毅','梁超群',
+    '宋睿泽','郑瀚文','谢宇航','韩志强','唐嘉铭','冯思远','董浩然','萧逸飞','曹天佑','袁博文',
+    '蒋俊豪','沈嘉豪','韩宇辰','唐浩然','冯天翔','董宇轩','萧子轩','曹辰逸','袁泽洋','许睿诚'
   ];
 
   const actualClients = Math.min(numClients, CLIENTS.length);
@@ -1648,8 +1650,14 @@ function editBet(mid, bid) {
   document.getElementById('editBetMid').value = mid;
   document.getElementById('editBetBid').value = bid;
   document.getElementById('editBetClient').value = b.client;
-  document.getElementById('editBetPt').textContent = (PC[b.pt]||{}).n || b.pt;
-  document.getElementById('editBetOpt').textContent = b.opt + (b.hc ? '（盘口'+b.hc+'）' : '');
+
+  // 填充玩法下拉
+  const ptSel = document.getElementById('editBetPtSel');
+  ptSel.innerHTML = Object.entries(PC).map(([k, v]) => '<option value="'+k+'"'+(k===b.pt?' selected':'')+'>'+v.n+'</option>').join('');
+
+  // 填充选项（根据玩法动态生成）
+  onEditPtChange(b.opt, b.hc);
+
   document.getElementById('editBetAmt').value = b.amt;
   document.getElementById('editBetOdds').value = b.odds;
   // 时间：优先用 createdAt 解析出 HH:MM，其次用 b.time
@@ -1670,19 +1678,53 @@ function hideEditBet() {
   document.getElementById('editBetM').style.display = 'none';
 }
 
+// 编辑注单时切换玩法，动态更新选项
+function onEditPtChange(preserveOpt, preserveHc) {
+  const mid = document.getElementById('editBetMid').value;
+  const m = S.ms.find(x => x.id === mid); if (!m) return;
+  const pt = document.getElementById('editBetPtSel').value;
+  const cfg = PC[pt];
+  const optWrap = document.getElementById('editOptWrap');
+  if (pt === 'cs' || pt === 'htcs') {
+    let scores = [];
+    const max = pt === 'htcs' ? 4 : 6;
+    for (let i = 0; i <= max; i++) for (let j = 0; j <= max; j++) scores.push(i+'-'+j);
+    if (pt === 'cs') scores.push('其他');
+    optWrap.innerHTML = '<label style="font-size:13px;color:#94a3b8">选项</label>' +
+      '<input id="editBetOptInput" list="editSclist" placeholder="选择或输入比分（如9:0）" style="margin-top:4px;width:100%" value="'+(preserveOpt||'')+'">' +
+      '<datalist id="editSclist">'+scores.map(s => '<option value="'+s+'">').join('')+'</datalist>';
+  } else if (cfg && cfg.o) {
+    const opts = cfg.o(m.h, m.a);
+    optWrap.innerHTML = '<label style="font-size:13px;color:#94a3b8">选项</label>' +
+      '<select id="editBetOptInput" style="margin-top:4px;width:100%">'+opts.map(o => '<option value="'+o+'"'+(o===preserveOpt?' selected':'')+'>'+o+'</option>').join('')+'</select>';
+  } else {
+    optWrap.innerHTML = '<label style="font-size:13px;color:#94a3b8">选项</label><input id="editBetOptInput" placeholder="投注选项" style="margin-top:4px;width:100%" value="'+(preserveOpt||'')+'">';
+  }
+  // 盘口显示
+  const hcWrap = document.getElementById('editBetHcWrap');
+  if (cfg && cfg.hc) { hcWrap.style.display = ''; if (preserveHc !== undefined) document.getElementById('editBetHc').value = preserveHc||''; }
+  else { hcWrap.style.display = 'none'; }
+}
+
 function doEditBetSave() {
   const mid = document.getElementById('editBetMid').value;
   const bid = document.getElementById('editBetBid').value;
   const m = S.ms.find(x => x.id === mid); if (!m) return;
   const b = m.bets.find(x => x.id === bid); if (!b) return;
   const client = document.getElementById('editBetClient').value.trim();
+  const pt = document.getElementById('editBetPtSel').value;
+  const optInput = document.getElementById('editBetOptInput');
+  const opt = optInput ? optInput.value.trim() : '';
   const amt = parseInt(document.getElementById('editBetAmt').value);
   const odds = parseFloat(document.getElementById('editBetOdds').value);
   const time = document.getElementById('editBetTime').value;
   if (!client) return alert('请输入客户');
+  if (!opt) return alert('请输入或选择投注选项');
   if (!amt || amt <= 0) return alert('请输入有效金额');
   if (!odds || odds < 1) return alert('请输入有效赔率');
   b.client = client;
+  b.pt = pt;
+  b.opt = opt;
   b.amt = amt;
   b.odds = odds;
   // 同步时间：更新 b.time 和 b.createdAt
@@ -1694,7 +1736,26 @@ function doEditBetSave() {
     d.setHours(parseInt(parts[0])||0, parseInt(parts[1])||0, 0, 0);
     b.createdAt = d.toISOString();
   }
-  if (b.hc !== undefined) b.hc = document.getElementById('editBetHc').value || b.hc;
+  // 盘口
+  if (PC[pt] && PC[pt].hc) {
+    const hcStr = document.getElementById('editBetHc').value.trim();
+    if (hcStr) {
+      if (hcStr.includes('/')) {
+        const parts = hcStr.split('/').map(s => parseFloat(s.trim()));
+        b.hc = parts.reduce((a, v) => a + v, 0) / parts.length;
+        b.hcSplit = parts;
+      } else {
+        b.hc = parseFloat(hcStr);
+        delete b.hcSplit;
+      }
+    } else {
+      b.hc = null;
+      delete b.hcSplit;
+    }
+  } else {
+    b.hc = null;
+    delete b.hcSplit;
+  }
   b.updatedAt = new Date().toISOString();
   S.cl.add(client);
   save(); renderList();
