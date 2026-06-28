@@ -2975,16 +2975,30 @@ function load() {
 }
 
 async function init() {
-  loadFromLocal();
   // 预加载客户列表（如果为空）
   if (!S.cl.size) {
     CLIENTS.forEach(c => S.cl.add(c));
   }
   setSyncStatus('syncing');
+  
+  // 优先从服务器加载最新数据
   const serverLoaded = await loadFromServer();
+  
   if (serverLoaded === null) {
+    // 服务器不可用，从本地加载
     setSyncStatus('offline');
+    loadFromLocal();
+    if (!S.ms.length) {
+      S.ms.push({
+        id: 'm'+Date.now(),
+        h: '曼城', a: '利物浦', time: '',
+        pts: ['1x2','ah','ou','cs'],
+        bets: [], res: null
+      });
+      save();
+    }
   } else if (serverLoaded === false && !S.ms.length) {
+    // 服务器返回空数据且本地也空，创建示例
     S.ms.push({
       id: 'm'+Date.now(),
       h: '曼城', a: '利物浦', time: '',
@@ -2993,6 +3007,7 @@ async function init() {
     });
     save();
   }
+  // 如果服务器加载成功，数据已经在 loadFromServer() 中更新了
   renderPTChk(null);
   renderList();
   try {
